@@ -33,7 +33,7 @@
 
 #include "battery.hpp"
 
-#include <lib/ecl/geo/geo.h>
+#include <lib/geo/geo.h>
 #include <px4_defines.h>
 
 const char *const UavcanBatteryBridge::NAME = "battery";
@@ -69,7 +69,7 @@ UavcanBatteryBridge::battery_sub_cb(const uavcan::ReceivedDataStructure<uavcan::
 	battery.voltage_filtered_v = msg.voltage;
 	battery.current_a = msg.current;
 	battery.current_filtered_a = msg.current;
-	// battery.average_current_a = msg.;
+	// battery.current_average_a = msg.;
 
 	sumDischarged(battery.timestamp, battery.current_a);
 	battery.discharged_mah = _discharged_mah;
@@ -83,7 +83,7 @@ UavcanBatteryBridge::battery_sub_cb(const uavcan::ReceivedDataStructure<uavcan::
 	// battery.priority = msg.;
 	battery.capacity = msg.full_charge_capacity_wh;
 	// battery.cycle_count = msg.;
-	// battery.run_time_to_empty = msg.;
+	// battery.time_remaining_s = msg.;
 	// battery.average_time_to_empty = msg.;
 	battery.serial_number = msg.model_instance_id;
 	battery.id = msg.getSrcNodeID().get();
