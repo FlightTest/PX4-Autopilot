@@ -80,69 +80,69 @@
 // RESET    finalise flash programming, reset chip and starts application
 //
 
-#define BL_PROTOCOL_VERSION     5   // The revision of the bootloader protocol
+#define BL_PROTOCOL_VERSION         5   // The revision of the bootloader protocol
 //* Next revision needs to update
 
 // protocol bytes
-#define PROTO_INSYNC        0x12    // 'in sync' byte sent before status
-#define PROTO_EOC         0x20    // end of command
+#define PROTO_INSYNC                0x12    // 'in sync' byte sent before status
+#define PROTO_EOC                   0x20    // end of command
 
 // Reply bytes
-#define PROTO_OK          0x10    // INSYNC/OK      - 'ok' response
-#define PROTO_FAILED        0x11    // INSYNC/FAILED  - 'fail' response
-#define PROTO_INVALID       0x13  // INSYNC/INVALID - 'invalid' response for bad commands
-#define PROTO_BAD_SILICON_REV     0x14  // On the F4 series there is an issue with < Rev 3 silicon
-#define PROTO_RESERVED_0X15     0x15  // Reserved
+#define PROTO_OK                    0x10    // INSYNC/OK      - 'ok' response
+#define PROTO_FAILED                0x11    // INSYNC/FAILED  - 'fail' response
+#define PROTO_INVALID               0x13    // INSYNC/INVALID - 'invalid' response for bad commands
+#define PROTO_BAD_SILICON_REV       0x14    // On the F4 series there is an issue with < Rev 3 silicon
+#define PROTO_RESERVED_0X15         0x15    // Reserved
 
 // see https://pixhawk.org/help/errata
 // Command bytes
-#define PROTO_GET_SYNC        0x21    // NOP for re-establishing sync
-#define PROTO_GET_DEVICE      0x22    // get device ID bytes
-#define PROTO_CHIP_ERASE      0x23    // erase program area and reset program address
-#define PROTO_PROG_MULTI      0x27    // write bytes at program address and increment
-#define PROTO_GET_CRC       0x29  // compute & return a CRC
-#define PROTO_GET_OTP       0x2a  // read a byte from OTP at the given address
-#define PROTO_GET_SN        0x2b    // read a word from UDID area ( Serial)  at the given address
-#define PROTO_GET_CHIP        0x2c    // read chip version (MCU IDCODE)
-#define PROTO_SET_DELAY       0x2d    // set minimum boot delay
-#define PROTO_GET_CHIP_DES      0x2e    // read chip version In ASCII
-#define PROTO_BOOT          0x30    // boot the application
-#define PROTO_DEBUG         0x31    // emit debug information - format not defined
-#define PROTO_SET_BAUD        0x33    // set baud rate on uart
+#define PROTO_GET_SYNC              0x21    // NOP for re-establishing sync
+#define PROTO_GET_DEVICE            0x22    // get device ID bytes
+#define PROTO_CHIP_ERASE            0x23    // erase program area and reset program address
+#define PROTO_PROG_MULTI            0x27    // write bytes at program address and increment
+#define PROTO_GET_CRC               0x29    // compute & return a CRC
+#define PROTO_GET_OTP               0x2a    // read a byte from OTP at the given address
+#define PROTO_GET_SN                0x2b    // read a word from UDID area ( Serial)  at the given address
+#define PROTO_GET_CHIP              0x2c    // read chip version (MCU IDCODE)
+#define PROTO_SET_DELAY             0x2d    // set minimum boot delay
+#define PROTO_GET_CHIP_DES          0x2e    // read chip version In ASCII
+#define PROTO_BOOT                  0x30    // boot the application
+#define PROTO_DEBUG                 0x31    // emit debug information - format not defined
+#define PROTO_SET_BAUD              0x33    // set baud rate on uart
 
-#define PROTO_RESERVED_0X36     0x36  // Reserved
-#define PROTO_RESERVED_0X37     0x37  // Reserved
-#define PROTO_RESERVED_0X38     0x38  // Reserved
-#define PROTO_RESERVED_0X39     0x39  // Reserved
+#define PROTO_RESERVED_0X36         0x36  // Reserved
+#define PROTO_RESERVED_0X37         0x37  // Reserved
+#define PROTO_RESERVED_0X38         0x38  // Reserved
+#define PROTO_RESERVED_0X39         0x39  // Reserved
 
-#define PROTO_PROG_MULTI_MAX    64  // maximum PROG_MULTI size
-#define PROTO_READ_MULTI_MAX    255 // size of the size field
+#define PROTO_PROG_MULTI_MAX        64  // maximum PROG_MULTI size
+#define PROTO_READ_MULTI_MAX        255 // size of the size field
 
 /* argument values for PROTO_GET_DEVICE */
-#define PROTO_DEVICE_BL_REV 1 // bootloader revision
-#define PROTO_DEVICE_BOARD_ID 2 // board ID
-#define PROTO_DEVICE_BOARD_REV  3 // board revision
-#define PROTO_DEVICE_FW_SIZE  4 // size of flashable area
-#define PROTO_DEVICE_VEC_AREA 5 // contents of reserved vectors 7-10
+#define PROTO_DEVICE_BL_REV         1 // bootloader revision
+#define PROTO_DEVICE_BOARD_ID       2 // board ID
+#define PROTO_DEVICE_BOARD_REV      3 // board revision
+#define PROTO_DEVICE_FW_SIZE        4 // size of flashable area
+#define PROTO_DEVICE_VEC_AREA       5 // contents of reserved vectors 7-10
 
-#define STATE_PROTO_OK          0x10    // INSYNC/OK      - 'ok' response
-#define STATE_PROTO_FAILED        0x11    // INSYNC/FAILED  - 'fail' response
-#define STATE_PROTO_INVALID       0x13  // INSYNC/INVALID - 'invalid' response for bad commands
-#define STATE_PROTO_BAD_SILICON_REV     0x14  // On the F4 series there is an issue with < Rev 3 silicon
-#define STATE_PROTO_RESERVED_0X15     0x15  // Reserved
+#define STATE_PROTO_OK              0x10    // INSYNC/OK      - 'ok' response
+#define STATE_PROTO_FAILED          0x11    // INSYNC/FAILED  - 'fail' response
+#define STATE_PROTO_INVALID         0x13  // INSYNC/INVALID - 'invalid' response for bad commands
+#define STATE_PROTO_BAD_SILICON_REV 0x14  // On the F4 series there is an issue with < Rev 3 silicon
+#define STATE_PROTO_RESERVED_0X15   0x15  // Reserved
 
 
 // State
-#define STATE_PROTO_GET_SYNC      0x1     // Have Seen NOP for re-establishing sync
-#define STATE_PROTO_GET_DEVICE    0x2     // Have Seen get device ID bytes
-#define STATE_PROTO_CHIP_ERASE    0x4     // Have Seen erase program area and reset program address
-#define STATE_PROTO_PROG_MULTI    0x8     // Have Seen write bytes at program address and increment
-#define STATE_PROTO_GET_CRC       0x10    // Have Seen compute & return a CRC
-#define STATE_PROTO_GET_OTP       0x20    // Have Seen read a byte from OTP at the given address
-#define STATE_PROTO_GET_SN        0x40    // Have Seen read a word from UDID area ( Serial)  at the given address
-#define STATE_PROTO_GET_CHIP      0x80    // Have Seen read chip version (MCU IDCODE)
-#define STATE_PROTO_GET_CHIP_DES  0x100   // Have Seen read chip version In ASCII
-#define STATE_PROTO_BOOT          0x200   // Have Seen boot the application
+#define STATE_PROTO_GET_SYNC        0x1     // Have Seen NOP for re-establishing sync
+#define STATE_PROTO_GET_DEVICE      0x2     // Have Seen get device ID bytes
+#define STATE_PROTO_CHIP_ERASE      0x4     // Have Seen erase program area and reset program address
+#define STATE_PROTO_PROG_MULTI      0x8     // Have Seen write bytes at program address and increment
+#define STATE_PROTO_GET_CRC         0x10    // Have Seen compute & return a CRC
+#define STATE_PROTO_GET_OTP         0x20    // Have Seen read a byte from OTP at the given address
+#define STATE_PROTO_GET_SN          0x40    // Have Seen read a word from UDID area ( Serial)  at the given address
+#define STATE_PROTO_GET_CHIP        0x80    // Have Seen read chip version (MCU IDCODE)
+#define STATE_PROTO_GET_CHIP_DES    0x100   // Have Seen read chip version In ASCII
+#define STATE_PROTO_BOOT            0x200   // Have Seen boot the application
 
 #if defined(TARGET_HW_PX4_PIO_V1)
 #define STATE_ALLOWS_ERASE        (STATE_PROTO_GET_SYNC)
@@ -294,13 +294,13 @@ void
 jump_to_app()
 {
 	const uint32_t *app_base = (const uint32_t *)APP_LOAD_ADDRESS;
-	const uint32_t *vec_base = (const uint32_t *)app_base;
+	const uint32_t *vec_base = (const uint32_t *)app_base + APP_VECTOR_OFFSET;
 
 	/*
 	 * We refuse to program the first word of the app until the upload is marked
 	 * complete by the host.  So if it's not 0xffffffff, we should try booting it.
 	 */
-	if (app_base[0] == 0xffffffff) {
+	if (app_base[APP_VECTOR_OFFSET_WORDS] == 0xffffffff) {
 		return;
 	}
 
@@ -382,14 +382,18 @@ jump_to_app()
 	 * The second word of the app is the entrypoint; it must point within the
 	 * flash area (or we have a bad flash).
 	 */
-	if (app_base[1] < APP_LOAD_ADDRESS) {
+	if (app_base[APP_VECTOR_OFFSET_WORDS + 1] < APP_LOAD_ADDRESS) {
 		return;
 	}
 
-	if (app_base[1] >= (APP_LOAD_ADDRESS + board_info.fw_size)) {
+	if (app_base[APP_VECTOR_OFFSET_WORDS + 1] >= (APP_LOAD_ADDRESS + board_info.fw_size)) {
 		return;
 	}
 
+#endif
+
+#ifdef BOOTLOADER_USE_SECURITY
+	crypto_deinit();
 #endif
 
 	/* just for paranoia's sake */
@@ -812,15 +816,17 @@ bootloader(unsigned timeout)
 				goto cmd_bad;
 			}
 
-			if (address == 0) {
+#if APP_VECTOR_OFFSET == 0
 
-#if defined(TARGET_HW_PX4_FMU_V4)
+			if (address == APP_VECTOR_OFFSET) {
+
+#  if defined(TARGET_HW_PX4_FMU_V4)
 
 				if (check_silicon()) {
 					goto bad_silicon;
 				}
 
-#endif
+# endif
 
 				// save the first word and don't program it until everything else is done
 				first_word = flash_buffer.w[0];
@@ -828,10 +834,20 @@ bootloader(unsigned timeout)
 				flash_buffer.w[0] = 0xffffffff;
 			}
 
+#endif
 			arg /= 4;
 
 			for (int i = 0; i < arg; i++) {
+#if APP_VECTOR_OFFSET != 0
 
+				if (address == APP_VECTOR_OFFSET) {
+					// save the first word from vector table and don't program it until everything else is done
+					first_word = flash_buffer.w[i];
+					// replace first word with bits we can overwrite later
+					flash_buffer.w[i] = 0xffffffff;
+				}
+
+#endif
 				// program the word
 				flash_func_write_word(address, flash_buffer.w[i]);
 
@@ -865,7 +881,7 @@ bootloader(unsigned timeout)
 			for (unsigned p = 0; p < board_info.fw_size; p += 4) {
 				uint32_t bytes;
 
-				if ((p == 0) && (first_word != 0xffffffff)) {
+				if ((p == APP_VECTOR_OFFSET) && (first_word != 0xffffffff)) {
 					bytes = first_word;
 
 				} else {
@@ -1028,9 +1044,9 @@ bootloader(unsigned timeout)
 
 			// program the deferred first word
 			if (first_word != 0xffffffff) {
-				flash_func_write_word(0, first_word);
+				flash_func_write_word(APP_VECTOR_OFFSET, first_word);
 
-				if (flash_func_read_word(0) != first_word) {
+				if (flash_func_read_word(APP_VECTOR_OFFSET) != first_word) {
 					goto cmd_fail;
 				}
 

@@ -49,7 +49,11 @@ add_custom_target(metadata_airframes
 set(generated_params_dir ${PX4_BINARY_DIR}/generated_params_metadata)
 file(GLOB_RECURSE yaml_config_files ${PX4_SOURCE_DIR}/src/modules/*.yaml
 	${PX4_SOURCE_DIR}/src/drivers/*.yaml ${PX4_SOURCE_DIR}/src/lib/*.yaml)
-list(FILTER yaml_config_files EXCLUDE REGEX ".*/pwm_out_sim/") # avoid param duplicates
+
+# avoid param duplicates
+list(FILTER yaml_config_files EXCLUDE REGEX ".*/pwm_out_sim/")
+list(FILTER yaml_config_files EXCLUDE REGEX ".*/linux_pwm_out/")
+
 add_custom_target(metadata_parameters
 	COMMAND ${CMAKE_COMMAND} -E make_directory ${PX4_BINARY_DIR}/docs
 	COMMAND ${CMAKE_COMMAND} -E make_directory ${generated_params_dir}
@@ -61,6 +65,7 @@ add_custom_target(metadata_parameters
 		--params-file ${generated_params_dir}/module_params.c
 		--timer-config ${PX4_SOURCE_DIR}/boards/px4/fmu-v5/src/timer_config.cpp # select a typical board
 		--board-with-io
+		--ethernet
 		--config-files ${yaml_config_files} #--verbose
 
 	COMMAND ${PYTHON_EXECUTABLE} ${PX4_SOURCE_DIR}/src/lib/parameters/px_process_params.py

@@ -94,12 +94,28 @@
 #  define HRT_CLOCK_ALL()  imxrt_clockall_gpt_bus()         /* The Clock Gating macro for this GPT */
 #elif HRT_TIMER == 2
 #  define HRT_CLOCK_ALL()  imxrt_clockall_gpt2_bus()        /* The Clock Gating macro for this GPT */
+#elif HRT_TIMER == 3
+#  define HRT_CLOCK_ALL()  imxrt_clockall_gpt3_bus()        /* The Clock Gating macro for this GPT */
+#elif HRT_TIMER == 4
+#  define HRT_CLOCK_ALL()  imxrt_clockall_gpt4_bus()        /* The Clock Gating macro for this GPT */
+#elif HRT_TIMER == 5
+#  define HRT_CLOCK_ALL()  imxrt_clockall_gpt5_bus()        /* The Clock Gating macro for this GPT */
+#elif HRT_TIMER == 6
+#  define HRT_CLOCK_ALL()  imxrt_clockall_gpt6_bus()        /* The Clock Gating macro for this GPT */
 #endif
 
 #if HRT_TIMER == 1 && defined(CONFIG_IMXRT_GPT1)
 #  error must not set CONFIG_IMXRT_GPT1=y and HRT_TIMER=1
 #elif   HRT_TIMER == 2 && defined(CONFIG_IMXRT_GPT2)
 #  error must not set CONFIG_IMXRT_GPT2=y and HRT_TIMER=2
+#elif   HRT_TIMER == 3 && defined(CONFIG_IMXRT_GPT3)
+#  error must not set CONFIG_IMXRT_GPT3=y and HRT_TIMER=3
+#elif   HRT_TIMER == 4 && defined(CONFIG_IMXRT_GPT4)
+#  error must not set CONFIG_IMXRT_GPT4=y and HRT_TIMER=4
+#elif   HRT_TIMER == 5 && defined(CONFIG_IMXRT_GPT5)
+#  error must not set CONFIG_IMXRT_GPT5=y and HRT_TIMER=5
+#elif   HRT_TIMER == 6 && defined(CONFIG_IMXRT_GPT6)
+#  error must not set CONFIG_IMXRT_GPT6=y and HRT_TIMER=6
 #endif
 
 /*
@@ -165,7 +181,7 @@
 # define STATUS_HRT      CAT(GPT_SR_OF, HRT_TIMER_CHANNEL)         /* OF Output Compare Flag */
 # define OFIE_HRT        CAT3(GPT_IR_OF, HRT_TIMER_CHANNEL,IE)     /* Output Compare Interrupt Enable */
 
-#if (HRT_TIMER_CHANNEL > 1) || (HRT_TIMER_CHANNEL > 3)
+#if (HRT_TIMER_CHANNEL < 1) || (HRT_TIMER_CHANNEL > 3)
 #  error HRT_TIMER_CHANNEL must be a value between 1 and 3
 #endif
 
@@ -559,31 +575,6 @@ hrt_absolute_time(void)
 	px4_leave_critical_section(flags);
 
 	return abstime;
-}
-
-/**
- * Convert a timespec to absolute time
- */
-hrt_abstime
-ts_to_abstime(const struct timespec *ts)
-{
-	hrt_abstime	result;
-
-	result = (hrt_abstime)(ts->tv_sec) * 1000000;
-	result += ts->tv_nsec / 1000;
-
-	return result;
-}
-
-/**
- * Convert absolute time to a timespec.
- */
-void
-abstime_to_ts(struct timespec *ts, hrt_abstime abstime)
-{
-	ts->tv_sec = abstime / 1000000;
-	abstime -= ts->tv_sec * 1000000;
-	ts->tv_nsec = abstime * 1000;
 }
 
 /**

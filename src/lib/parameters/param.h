@@ -317,13 +317,12 @@ __EXPORT void		param_reset_specific(const char *resets[], int num_resets);
  * Export changed parameters to a file.
  * Note: this method requires a large amount of stack size!
  *
- * @param fd		File descriptor to export to (-1 selects the FLASH storage).
- * @param only_unsaved	Only export changed parameters that have not yet been exported.
+ * @param filename	Path to the default parameter file.
  * @param filter	Filter parameters to be exported. The method should return true if
  * 			the parameter should be exported. No filtering if nullptr is passed.
  * @return		Zero on success, nonzero on failure.
  */
-__EXPORT int		param_export(int fd, bool only_unsaved, param_filter_func filter);
+__EXPORT int		param_export(const char *filename, param_filter_func filter);
 
 /**
  * Import parameters from a file, discarding any unrecognized parameters.
@@ -331,11 +330,10 @@ __EXPORT int		param_export(int fd, bool only_unsaved, param_filter_func filter);
  * This function merges the imported parameters with the current parameter set.
  *
  * @param fd		File descriptor to import from (-1 selects the FLASH storage).
- * @param mark_saved	Whether to mark imported parameters as already saved
  * @return		Zero on success, nonzero if an error occurred during import.
  *			Note that in the failure case, parameters may be inconsistent.
  */
-__EXPORT int		param_import(int fd, bool mark_saved);
+__EXPORT int		param_import(int fd);
 
 /**
  * Load parameters from a file.
@@ -385,14 +383,34 @@ __EXPORT int 		param_set_default_file(const char *filename);
 __EXPORT const char	*param_get_default_file(void);
 
 /**
+ * Set the backup parameter file name.
+ *
+ * @param filename	Path to the backup parameter file. The file is not required to
+ *			exist.
+ * @return		Zero on success.
+ */
+__EXPORT int 		param_set_backup_file(const char *filename);
+
+/**
+ * Get the backup parameter file name.
+ *
+ * @return		The path to the backup parameter file
+ */
+__EXPORT const char	*param_get_backup_file(void);
+
+/**
  * Save parameters to the default file.
+ *
  * Note: this method requires a large amount of stack size!
  *
  * This function saves all parameters with non-default values.
  *
- * @return		Zero on success.
+ * @param blocking	If true, in case the default file is busy, the function blocks
+ * 			until the file is available for writing.
+ *
+ * @return		Zero on success, -EWOULDBLOCK if the file is busy and blocking is false.
  */
-__EXPORT int 		param_save_default(void);
+__EXPORT int 		param_save_default(bool blocking);
 
 /**
  * Load parameters from the default parameter file.

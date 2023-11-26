@@ -153,13 +153,31 @@ float *DataValidatorGroup::get_best(uint64_t timestamp, int *index)
 
 	int i = 0;
 
+	// First find the current selected sensor
+	while (next != nullptr) {
+		if (i == pre_check_best) {
+			const int prio = next->priority();
+			const float confidence = next->confidence(timestamp);
+
+			pre_check_prio = prio;
+			pre_check_confidence = confidence;
+
+			max_index = i;
+			max_confidence = confidence;
+			max_priority = prio;
+			best = next;
+			break;
+		}
+
+		next = next->sibling();
+		i++;
+	}
+
+	i = 0;
+	next = _first;
+
 	while (next != nullptr) {
 		float confidence = next->confidence(timestamp);
-
-		if (i == pre_check_best) {
-			pre_check_prio = next->priority();
-			pre_check_confidence = confidence;
-		}
 
 		/*
 		 * Switch if:
@@ -225,8 +243,8 @@ float *DataValidatorGroup::get_best(uint64_t timestamp, int *index)
 
 void DataValidatorGroup::print()
 {
-	PX4_INFO("validator: best: %d, prev best: %d, failsafe: %s (%u events)", _curr_best, _prev_best,
-		 (_toggle_count > 0) ? "YES" : "NO", _toggle_count);
+	PX4_INFO_RAW("validator: best: %d, prev best: %d, failsafe: %s (%u events)\n", _curr_best, _prev_best,
+		     (_toggle_count > 0) ? "YES" : "NO", _toggle_count);
 
 	DataValidator *next = _first;
 	unsigned i = 0;
@@ -235,13 +253,13 @@ void DataValidatorGroup::print()
 		if (next->used()) {
 			uint32_t flags = next->state();
 
-			PX4_INFO("sensor #%u, prio: %d, state:%s%s%s%s%s%s", i, next->priority(),
-				 ((flags & DataValidator::ERROR_FLAG_NO_DATA) ? " OFF" : ""),
-				 ((flags & DataValidator::ERROR_FLAG_STALE_DATA) ? " STALE" : ""),
-				 ((flags & DataValidator::ERROR_FLAG_TIMEOUT) ? " TOUT" : ""),
-				 ((flags & DataValidator::ERROR_FLAG_HIGH_ERRCOUNT) ? " ECNT" : ""),
-				 ((flags & DataValidator::ERROR_FLAG_HIGH_ERRDENSITY) ? " EDNST" : ""),
-				 ((flags == DataValidator::ERROR_FLAG_NO_ERROR) ? " OK" : ""));
+			PX4_INFO_RAW("sensor #%u, prio: %d, state:%s%s%s%s%s%s\n", i, next->priority(),
+				     ((flags & DataValidator::ERROR_FLAG_NO_DATA) ? " OFF" : ""),
+				     ((flags & DataValidator::ERROR_FLAG_STALE_DATA) ? " STALE" : ""),
+				     ((flags & DataValidator::ERROR_FLAG_TIMEOUT) ? " TOUT" : ""),
+				     ((flags & DataValidator::ERROR_FLAG_HIGH_ERRCOUNT) ? " ECNT" : ""),
+				     ((flags & DataValidator::ERROR_FLAG_HIGH_ERRDENSITY) ? " EDNST" : ""),
+				     ((flags == DataValidator::ERROR_FLAG_NO_ERROR) ? " OK" : ""));
 
 			next->print();
 		}

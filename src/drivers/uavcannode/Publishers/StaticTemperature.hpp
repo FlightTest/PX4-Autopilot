@@ -39,6 +39,7 @@
 
 #include <uORB/SubscriptionCallback.hpp>
 #include <uORB/topics/sensor_baro.h>
+#include <lib/atmosphere/atmosphere.h>
 
 namespace uavcannode
 {
@@ -53,7 +54,9 @@ public:
 		UavcanPublisherBase(uavcan::equipment::air_data::StaticTemperature::DefaultDataTypeID),
 		uORB::SubscriptionCallbackWorkItem(work_item, ORB_ID(sensor_baro)),
 		uavcan::Publisher<uavcan::equipment::air_data::StaticTemperature>(node)
-	{}
+	{
+		this->setPriority(uavcan::TransferPriority::MiddleLower);
+	}
 
 	void PrintInfo() override
 	{
@@ -72,7 +75,7 @@ public:
 
 		if ((hrt_elapsed_time(&_last_static_temperature_publish) > 1_s) && uORB::SubscriptionCallbackWorkItem::update(&baro)) {
 			uavcan::equipment::air_data::StaticTemperature static_temperature{};
-			static_temperature.static_temperature = baro.temperature + CONSTANTS_ABSOLUTE_NULL_CELSIUS;
+			static_temperature.static_temperature = baro.temperature - atmosphere::kAbsoluteNullCelsius;
 			uavcan::Publisher<uavcan::equipment::air_data::StaticTemperature>::broadcast(static_temperature);
 
 			// ensure callback is registered

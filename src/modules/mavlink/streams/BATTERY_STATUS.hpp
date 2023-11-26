@@ -75,7 +75,7 @@ private:
 				bat_msg.current_consumed = (battery_status.connected) ? battery_status.discharged_mah : -1;
 				bat_msg.energy_consumed = -1;
 				bat_msg.current_battery = (battery_status.connected) ? battery_status.current_filtered_a * 100 : -1;
-				bat_msg.battery_remaining = (battery_status.connected) ? ceilf(battery_status.remaining * 100.f) : -1;
+				bat_msg.battery_remaining = (battery_status.connected) ? roundf(battery_status.remaining * 100.f) : -1;
 				// MAVLink extension: 0 is unsupported, in uORB it's NAN
 				bat_msg.time_remaining = (battery_status.connected && (PX4_ISFINITE(battery_status.time_remaining_s))) ?
 							 math::max((int)battery_status.time_remaining_s, 1) : 0;
@@ -101,10 +101,34 @@ private:
 					bat_msg.charge_state = MAV_BATTERY_CHARGE_STATE_FAILED;
 					break;
 
+				case (battery_status_s::BATTERY_STATE_UNHEALTHY):
+					bat_msg.charge_state = MAV_BATTERY_CHARGE_STATE_UNHEALTHY;
+					break;
+
+				case (battery_status_s::BATTERY_STATE_CHARGING):
+					bat_msg.charge_state = MAV_BATTERY_CHARGE_STATE_CHARGING;
+					break;
+
 				default:
 					bat_msg.charge_state = MAV_BATTERY_CHARGE_STATE_UNDEFINED;
 					break;
 				}
+
+				switch (battery_status.mode) {
+				case (battery_status_s::BATTERY_MODE_AUTO_DISCHARGING):
+					bat_msg.mode = MAV_BATTERY_MODE_AUTO_DISCHARGING;
+					break;
+
+				case (battery_status_s::BATTERY_MODE_HOT_SWAP):
+					bat_msg.mode = MAV_BATTERY_MODE_HOT_SWAP;
+					break;
+
+				default:
+					bat_msg.mode = MAV_BATTERY_MODE_UNKNOWN;
+					break;
+				}
+
+				bat_msg.fault_bitmask = battery_status.faults;
 
 				// check if temperature valid
 				if (battery_status.connected && PX4_ISFINITE(battery_status.temperature)) {
@@ -114,27 +138,62 @@ private:
 					bat_msg.temperature = INT16_MAX;
 				}
 
-				static constexpr int mavlink_cells_max = (sizeof(bat_msg.voltages) / sizeof(bat_msg.voltages[0]));
-				static constexpr int uorb_cells_max =
-					(sizeof(battery_status.voltage_cell_v) / sizeof(battery_status.voltage_cell_v[0]));
+				// fill cell voltages
+				static constexpr int mavlink_cell_slots = (sizeof(bat_msg.voltages) / sizeof(bat_msg.voltages[0]));
+				static constexpr int mavlink_cell_slots_extension
+					= (sizeof(bat_msg.voltages_ext) / sizeof(bat_msg.voltages_ext[0]));
 
-				for (int cell = 0; cell < mavlink_cells_max; cell++) {
-					if (battery_status.connected && (cell < battery_status.cell_count) && (cell < uorb_cells_max)) {
-						bat_msg.voltages[cell] = battery_status.voltage_cell_v[cell] * 1000.f;
-
-					} else {
-						bat_msg.voltages[cell] = UINT16_MAX;
-					}
+				// Fill defaults first, voltage fields 1-10
+				for (int i = 0; i < mavlink_cell_slots; ++i) {
+					bat_msg.voltages[i] = UINT16_MAX;
 				}
 
-				static constexpr int mavlink_cells_ext_max = (sizeof(bat_msg.voltages_ext) / sizeof(bat_msg.voltages_ext[0]));
+				// And extensions fields 11-14: 0 if unused for backwards compatibility and 0 truncation.
+				for (int i = 0; i < mavlink_cell_slots_extension; ++i) {
+					bat_msg.voltages_ext[i] = 0;
+				}
 
-				for (int cell = mavlink_cells_max; cell < mavlink_cells_max + mavlink_cells_ext_max; cell++) {
-					if (battery_status.connected && (cell < battery_status.cell_count) && (cell < uorb_cells_max)) {
-						bat_msg.voltages_ext[cell - mavlink_cells_max] = battery_status.voltage_cell_v[cell] * 1000.0f;
+				if (battery_status.connected) {
+					// We don't know the cell count or we don't know the indpendent cell voltages,
+					// so we report the total voltage in the first cell, or cell(s) if the voltage
+					// doesn't "fit" in the UINT16.
+					if (battery_status.cell_count == 0 || battery_status.voltage_cell_v[0] < 0.0001f) {
+						// If it doesn't fit, we have to split it into UINT16-1 chunks and the remaining
+						// voltage for the subsequent field.
+						// This won't work for voltages of more than 655 volts.
+						const int num_fields_required = static_cast<int>(battery_status.voltage_filtered_v * 1000.f) / (UINT16_MAX - 1) + 1;
+
+						if (num_fields_required <= mavlink_cell_slots) {
+							float remaining_voltage = battery_status.voltage_filtered_v * 1000.f;
+
+							for (int i = 0; i < num_fields_required - 1; ++i) {
+								bat_msg.voltages[i] = UINT16_MAX - 1;
+								remaining_voltage -= UINT16_MAX - 1;
+							}
+
+							bat_msg.voltages[num_fields_required - 1] = remaining_voltage;
+
+						} else {
+							// Leave it default/unknown. We're out of spec.
+						}
+
 
 					} else {
-						bat_msg.voltages_ext[cell - mavlink_cells_max] = UINT16_MAX;
+						static constexpr int uorb_cell_slots =
+							(sizeof(battery_status.voltage_cell_v) / sizeof(battery_status.voltage_cell_v[0]));
+
+						const int cell_slots = math::min(static_cast<int>(battery_status.cell_count),
+										 uorb_cell_slots,
+										 mavlink_cell_slots + mavlink_cell_slots_extension);
+
+						for (int i = 0; i < cell_slots; ++i) {
+							if (i < mavlink_cell_slots) {
+								bat_msg.voltages[i] = battery_status.voltage_cell_v[i] * 1000.f;
+
+							} else if ((i - mavlink_cell_slots) < mavlink_cell_slots_extension) {
+								bat_msg.voltages_ext[i - mavlink_cell_slots] = battery_status.voltage_cell_v[i] * 1000.f;
+							}
+						}
 					}
 				}
 

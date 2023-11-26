@@ -137,7 +137,10 @@ $ reboot
 	PRINT_MODULE_USAGE_ARG("<file>", "File name (use default if not given)", true);
 
 	PRINT_MODULE_USAGE_COMMAND_DESCR("select", "Select default file");
-	PRINT_MODULE_USAGE_ARG("<file>", "File name (use <root>/eeprom/parameters if not given)", true);
+	PRINT_MODULE_USAGE_ARG("<file>", "File name", true);
+
+	PRINT_MODULE_USAGE_COMMAND_DESCR("select-backup", "Select default file");
+	PRINT_MODULE_USAGE_ARG("<file>", "File name", true);
 
 	PRINT_MODULE_USAGE_COMMAND_DESCR("show", "Show parameter values");
 	PRINT_MODULE_USAGE_PARAM_FLAG('a', "Show all parameters (not just used)", true);
@@ -236,6 +239,23 @@ param_main(int argc, char *argv[])
 
 			if (default_file) {
 				PX4_INFO("selected parameter default file %s", default_file);
+			}
+
+			return 0;
+		}
+
+		if (!strcmp(argv[1], "select-backup")) {
+			if (argc >= 3) {
+				param_set_backup_file(argv[2]);
+
+			} else {
+				param_set_backup_file(nullptr);
+			}
+
+			const char *backup_file = param_get_backup_file();
+
+			if (backup_file) {
+				PX4_INFO("selected parameter backup file %s", backup_file);
 			}
 
 			return 0;
@@ -401,27 +421,16 @@ param_main(int argc, char *argv[])
 static int
 do_save(const char *param_file_name)
 {
-	/* create the file */
-	int fd = open(param_file_name, O_WRONLY | O_CREAT, PX4_O_MODE_666);
-
-	if (fd < 0) {
-		PX4_ERR("open '%s' failed (%i)", param_file_name, errno);
-		return 1;
-	}
-
-	int result = param_export(fd, false, nullptr);
-	close(fd);
+	int result = param_export(param_file_name, nullptr);
 
 	if (result < 0) {
-#ifndef __PX4_QURT
-		(void)unlink(param_file_name);
-#endif
 		PX4_ERR("exporting to '%s' failed (%i)", param_file_name, result);
 		return 1;
 	}
 
 	return 0;
 }
+
 
 static int
 do_load(const char *param_file_name)
@@ -460,11 +469,8 @@ do_load(const char *param_file_name)
 static int
 do_import(const char *param_file_name)
 {
-	bool mark_saved = false;
-
 	if (param_file_name == nullptr) {
 		param_file_name = param_get_default_file();
-		mark_saved = true; // if imported from default storage, mark as saved
 	}
 
 	int fd = -1;
@@ -476,9 +482,11 @@ do_import(const char *param_file_name)
 			PX4_ERR("open '%s' failed (%i)", param_file_name, errno);
 			return 1;
 		}
+
+		PX4_INFO("importing from '%s'", param_file_name);
 	}
 
-	int result = param_import(fd, mark_saved);
+	int result = param_import(fd);
 
 	if (fd >= 0) {
 		close(fd);
@@ -501,7 +509,7 @@ do_import(const char *param_file_name)
 static int
 do_save_default()
 {
-	return param_save_default();
+	return param_save_default(true);
 }
 
 static int
@@ -829,7 +837,7 @@ do_set(const char *name, const char *val, bool fail_on_not_found)
 static int
 do_set_custom_default(const char *name, const char *val, bool silent_fail)
 {
-	param_t param = param_find_no_notification(name);
+	param_t param = param_find(name);
 
 	/* set nothing if parameter cannot be found */
 	if (param == PARAM_INVALID && !silent_fail) {

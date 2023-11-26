@@ -34,6 +34,7 @@
 #pragma once
 
 #include <px4_platform_common/defines.h>
+#include <px4_platform_common/atomic.h>
 #include <stdint.h>
 #include <pthread.h>
 #include <drivers/drv_hrt.h>
@@ -78,7 +79,7 @@ public:
 
 	void thread_stop();
 
-	void start_log(LogType type, const char *filename);
+	bool start_log(LogType type, const char *filename);
 
 	void stop_log(LogType type);
 
@@ -119,6 +120,10 @@ public:
 
 	void set_need_reliable_transfer(bool need_reliable)
 	{
+		if (!need_reliable && _need_reliable_transfer) {
+			_want_fsync.store(true);
+		}
+
 		_need_reliable_transfer = need_reliable;
 	}
 
@@ -126,6 +131,8 @@ public:
 	{
 		return _need_reliable_transfer;
 	}
+
+	bool had_write_error() const { return _buffers[(int)LogType::Full]._had_write_error.load(); }
 
 	pthread_t thread_id() const { return _thread; }
 
@@ -170,6 +177,8 @@ private:
 
 		void close_file();
 
+		void reset();
+
 		size_t get_read_ptr(void **ptr, bool *is_part);
 
 		/**
@@ -192,6 +201,7 @@ private:
 		size_t count() const { return _count; }
 
 		bool _should_run = false;
+		px4::atomic_bool _had_write_error{false};
 	private:
 		const size_t _buffer_size;
 		int	_fd = -1;
@@ -205,8 +215,9 @@ private:
 
 	LogFileBuffer _buffers[(int)LogType::Count];
 
-	bool 		_exit_thread = false;
-	bool		_need_reliable_transfer = false;
+	px4::atomic_bool	_exit_thread{false};
+	bool			_need_reliable_transfer{false};
+	px4::atomic_bool	_want_fsync{false};
 	pthread_mutex_t		_mtx;
 	pthread_cond_t		_cv;
 	pthread_t _thread = 0;

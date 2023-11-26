@@ -51,7 +51,6 @@
 #include <uORB/topics/sensor_mag.h>
 #include <uORB/topics/vehicle_angular_velocity.h>
 #include <uORB/topics/vehicle_status.h>
-#include <uORB/topics/vehicle_status_flags.h>
 
 namespace mag_bias_estimator
 {
@@ -91,19 +90,18 @@ private:
 	uORB::Subscription _parameter_update_sub{ORB_ID(parameter_update)};
 	uORB::Subscription _vehicle_angular_velocity_sub{ORB_ID(vehicle_angular_velocity)};
 	uORB::Subscription _vehicle_status_sub{ORB_ID(vehicle_status)};
-	uORB::Subscription _vehicle_status_flags_sub{ORB_ID(vehicle_status_flags)};
 
 	uORB::Publication<magnetometer_bias_estimate_s> _magnetometer_bias_estimate_pub{ORB_ID(magnetometer_bias_estimate)};
 
 	calibration::Magnetometer _calibration[MAX_SENSOR_COUNT];
 
+	hrt_abstime _time_valid[MAX_SENSOR_COUNT] {};
+
 	bool _reset_field_estimator[MAX_SENSOR_COUNT] {};
 	bool _valid[MAX_SENSOR_COUNT] {};
 
-	bool _armed{false};
-	bool _system_calibrating{false};
-	bool _system_sensors_initialized{false};
 	uint8_t _arming_state{0};
+	bool _system_calibrating{false};
 
 	perf_counter_t _cycle_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": cycle")};
 

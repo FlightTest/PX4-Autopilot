@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2019 ECL Development Team. All rights reserved.
+ *   Copyright (c) 2019-2023 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -60,7 +60,12 @@ public:
 	// Setup the Ekf with synthetic measurements
 	void SetUp() override
 	{
+		// run briefly to init, then manually set in air and at rest (default for a real vehicle)
 		_ekf->init(0);
+		_sensor_simulator.runSeconds(0.1);
+		_ekf->set_in_air_status(false);
+		_ekf->set_vehicle_at_rest(true);
+
 		_sensor_simulator.simulateOrientation(_quat_sim);
 		_sensor_simulator.runSeconds(7);
 	}
@@ -78,9 +83,11 @@ TEST_F(EkfAirspeedTest, testWindVelocityEstimation)
 	const Vector2f airspeed_body(2.4f, 0.0f);
 	_ekf_wrapper.enableExternalVisionVelocityFusion();
 	_sensor_simulator._vio.setVelocity(simulated_velocity_earth);
+	_sensor_simulator._vio.setVelocityFrameToLocalNED();
 	_sensor_simulator.startExternalVision();
 
 	_ekf->set_in_air_status(true);
+	_ekf->set_vehicle_at_rest(false);
 	_ekf->set_is_fixed_wing(true);
 	_sensor_simulator.startAirspeedSensor();
 	_sensor_simulator._airspeed.setData(airspeed_body(0), airspeed_body(0));
@@ -98,7 +105,10 @@ TEST_F(EkfAirspeedTest, testWindVelocityEstimation)
 	EXPECT_TRUE(matrix::isEqual(vel, simulated_velocity_earth));
 	const Vector3f vel_wind_expected = simulated_velocity_earth - R_to_earth_sim * (Vector3f(airspeed_body(0),
 					   airspeed_body(1), 0.0f));
-	EXPECT_TRUE(matrix::isEqual(vel_wind_earth, Vector2f(vel_wind_expected.slice<2, 1>(0, 0))));
+
+	EXPECT_NEAR(vel_wind_earth(0), vel_wind_expected(0), 1e-1f);
+	EXPECT_NEAR(vel_wind_earth(1), vel_wind_expected(1), 1e-1f);
+
 	EXPECT_NEAR(height_before_pressure_correction, 0.0f, 1e-5f);
 
 	// Apply height correction
@@ -110,6 +120,7 @@ TEST_F(EkfAirspeedTest, testWindVelocityEstimation)
 	float expected_height_difference = 0.5f * static_pressure_coef_xp * airspeed_body(0) * airspeed_body(
 			0) / CONSTANTS_ONE_G;
 
+	_ekf->set_vehicle_at_rest(false);
 	_sensor_simulator.runSeconds(20);
 
 	const float height_after_pressure_correction = _ekf->getPosition()(2);
@@ -119,4 +130,39 @@ TEST_F(EkfAirspeedTest, testWindVelocityEstimation)
 
 	EXPECT_NEAR(height_after_pressure_correction, expected_height_after_pressure_correction, 1e-2f);
 
+}
+
+TEST_F(EkfAirspeedTest, testResetWindUsingAirspeed)
+{
+	const Vector3f simulated_velocity_earth(-3.6f, 8.f, 0.0f);
+	const Vector2f airspeed_body(15.f, 0.0f);
+	_ekf_wrapper.enableGpsFusion();
+	_sensor_simulator._gps.setVelocity(simulated_velocity_earth);
+	_sensor_simulator.startGps();
+	_sensor_simulator.runSeconds(11);
+
+	_ekf->set_in_air_status(true);
+	_ekf->set_vehicle_at_rest(false);
+	_ekf->set_is_fixed_wing(true);
+
+	// Simulate the fact that the sideslip can start immediately, without
+	// waiting for a measurement sample.
+	_ekf_wrapper.enableBetaFusion();
+	_sensor_simulator.runSeconds(0.1);
+	EXPECT_TRUE(_ekf_wrapper.isIntendingBetaFusion());
+
+	_sensor_simulator.startAirspeedSensor();
+	_sensor_simulator._airspeed.setData(airspeed_body(0), airspeed_body(0));
+	_sensor_simulator.runSeconds(0.1);
+
+	EXPECT_TRUE(_ekf_wrapper.isWindVelocityEstimated());
+
+	const Vector2f vel_wind_earth = _ekf->getWindVelocity();
+
+	const Dcmf R_to_earth_sim(_quat_sim);
+	const Vector3f vel_wind_expected = simulated_velocity_earth - R_to_earth_sim * (Vector3f(airspeed_body(0),
+					   airspeed_body(1), 0.0f));
+
+	EXPECT_NEAR(vel_wind_earth(0), vel_wind_expected(0), 1.f);
+	EXPECT_NEAR(vel_wind_earth(1), vel_wind_expected(1), 1.f);
 }

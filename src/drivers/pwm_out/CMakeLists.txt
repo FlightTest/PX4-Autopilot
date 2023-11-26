@@ -30,10 +30,18 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 ############################################################################
+
+set(PARAM_PREFIX PWM_MAIN)
+
+if(CONFIG_BOARD_IO)
+	set(PARAM_PREFIX PWM_AUX)
+endif()
+
 px4_add_module(
 	MODULE drivers__pwm_out
 	MAIN pwm_out
 	COMPILE_FLAGS
+		-DPARAM_PREFIX="${PARAM_PREFIX}"
 	SRCS
 		PWMOut.cpp
 		PWMOut.hpp
@@ -41,7 +49,5 @@ px4_add_module(
 		module.yaml
 	DEPENDS
 		arch_io_pins
-		mixer
 		mixer_module
-		output_limit
 	)

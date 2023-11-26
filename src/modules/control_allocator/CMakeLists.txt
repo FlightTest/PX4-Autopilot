@@ -40,6 +40,8 @@ px4_add_module(
 	MAIN control_allocator
 	COMPILE_FLAGS
 		${MAX_CUSTOM_OPT_LEVEL}
+	STACK_MAIN
+		3000
 	SRCS
 		ControlAllocator.cpp
 		ControlAllocator.hpp
@@ -49,6 +51,6 @@ px4_add_module(
 		mathlib
 		ActuatorEffectiveness
 		ControlAllocation
-		mixer
 		px4_work_queue
+		SlewRate
 )

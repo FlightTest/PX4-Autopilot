@@ -88,12 +88,6 @@
 #define ADC_CHANNELS \
 	((1 << ADC_BATTERY1_VOLTAGE_CHANNEL))
 
-/* Define Battery 1 Voltage Divider and A per V
- */
-
-#define BOARD_BATTERY1_V_DIV         (10.133333333f)
-#define BOARD_BATTERY1_A_PER_V       (36.367515152f)
-
 /* HW has to large of R termination on ADC todo:change when HW value is chosen */
 
 #define BOARD_ADC_OPEN_CIRCUIT_V               (5.6f)
@@ -120,11 +114,11 @@
 /* SD card bringup does not work if performed on the IDLE thread because it
  * will cause waiting.  Use either:
  *
- *  CONFIG_LIB_BOARDCTL=y, OR
+ *  CONFIG_BOARDCTL=y, OR
  *  CONFIG_BOARD_INITIALIZE=y && CONFIG_BOARD_INITTHREAD=y
  */
 
-#if defined(CONFIG_BOARD_INITIALIZE) && !defined(CONFIG_LIB_BOARDCTL) && !defined(CONFIG_BOARD_INITTHREAD)
+#if defined(CONFIG_BOARD_INITIALIZE) && !defined(CONFIG_BOARDCTL) && !defined(CONFIG_BOARD_INITTHREAD)
 #  warning SDIO initialization cannot be perfomed on the IDLE thread
 #endif
 

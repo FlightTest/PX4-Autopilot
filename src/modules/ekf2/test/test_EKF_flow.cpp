@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2019 ECL Development Team. All rights reserved.
+ *   Copyright (c) 2019-2023 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -64,7 +64,12 @@ public:
 		const float max_ground_distance = 50.f;
 		_ekf->set_optical_flow_limits(max_flow_rate, min_ground_distance, max_ground_distance);
 
+		// run briefly to init, then manually set in air and at rest (default for a real vehicle)
 		_ekf->init(0);
+		_sensor_simulator.runSeconds(0.1);
+		_ekf->set_in_air_status(false);
+		_ekf->set_vehicle_at_rest(true);
+
 		_sensor_simulator.runSeconds(7);
 	}
 
@@ -97,9 +102,9 @@ void EkfFlowTest::startZeroFlowFusion()
 void EkfFlowTest::setFlowFromHorizontalVelocityAndDistance(flowSample &flow_sample,
 		const Vector2f &simulated_horz_velocity, float estimated_distance_to_ground)
 {
-	flow_sample.flow_xy_rad =
-		Vector2f(simulated_horz_velocity(1) * flow_sample.dt / estimated_distance_to_ground,
-			 -simulated_horz_velocity(0) * flow_sample.dt / estimated_distance_to_ground);
+	flow_sample.flow_rate =
+		Vector2f(simulated_horz_velocity(1) / estimated_distance_to_ground,
+			 -simulated_horz_velocity(0) / estimated_distance_to_ground);
 }
 
 TEST_F(EkfFlowTest, resetToFlowVelocityInAir)
@@ -111,6 +116,7 @@ TEST_F(EkfFlowTest, resetToFlowVelocityInAir)
 	_sensor_simulator._trajectory[2].setCurrentPosition(-simulated_distance_to_ground);
 	startRangeFinderFusion(simulated_distance_to_ground);
 	_ekf->set_in_air_status(true);
+	_ekf->set_vehicle_at_rest(false);
 
 	_sensor_simulator.runSeconds(5.f);
 
@@ -134,6 +140,8 @@ TEST_F(EkfFlowTest, resetToFlowVelocityInAir)
 
 	// THEN: estimated velocity should match simulated velocity
 	const Vector3f estimated_velocity = _ekf->getVelocity();
+	estimated_velocity.print();
+	simulated_velocity.print();
 	EXPECT_TRUE(isEqual(estimated_velocity, simulated_velocity))
 			<< "estimated vel = " << estimated_velocity(0) << ", "
 			<< estimated_velocity(1);
@@ -157,11 +165,11 @@ TEST_F(EkfFlowTest, resetToFlowVelocityOnGround)
 
 	// WHEN: start fusing flow data
 	flowSample flow_sample = _sensor_simulator._flow.dataAtRest();
-	flow_sample.dt = 0.f; // some sensors force dt to zero when quality is low
 	flow_sample.quality = 0;
 	_sensor_simulator._flow.setData(flow_sample);
 	_ekf_wrapper.enableFlowFusion();
 	_sensor_simulator.startFlow();
+	_sensor_simulator.startRangeFinder();
 	_sensor_simulator.runSeconds(1.0);
 
 	// THEN: estimated velocity should match simulated velocity
@@ -182,7 +190,9 @@ TEST_F(EkfFlowTest, inAirConvergence)
 	const float simulated_distance_to_ground = 5.f;
 	_sensor_simulator._trajectory[2].setCurrentPosition(-simulated_distance_to_ground);
 	startRangeFinderFusion(simulated_distance_to_ground);
+
 	_ekf->set_in_air_status(true);
+	_ekf->set_vehicle_at_rest(false);
 
 	_sensor_simulator.runSeconds(5.f);
 
@@ -224,7 +234,9 @@ TEST_F(EkfFlowTest, yawMotionCorrectionWithAutopilotGyroData)
 	const float simulated_distance_to_ground = 5.f;
 	startRangeFinderFusion(simulated_distance_to_ground);
 	startZeroFlowFusion();
+
 	_ekf->set_in_air_status(true);
+	_ekf->set_vehicle_at_rest(false);
 
 	_sensor_simulator.runSeconds(5.f);
 
@@ -238,7 +250,7 @@ TEST_F(EkfFlowTest, yawMotionCorrectionWithAutopilotGyroData)
 	setFlowFromHorizontalVelocityAndDistance(flow_sample, simulated_horz_velocity, simulated_distance_to_ground);
 
 	// use autopilot gyro data
-	flow_sample.gyro_xyz.setAll(NAN);
+	flow_sample.gyro_rate.setAll(NAN);
 
 	_sensor_simulator._flow.setData(flow_sample);
 	_sensor_simulator._imu.setGyroData(body_rate);
@@ -259,7 +271,9 @@ TEST_F(EkfFlowTest, yawMotionCorrectionWithFlowGyroData)
 	const float simulated_distance_to_ground = 5.f;
 	startRangeFinderFusion(simulated_distance_to_ground);
 	startZeroFlowFusion();
+
 	_ekf->set_in_air_status(true);
+	_ekf->set_vehicle_at_rest(false);
 
 	_sensor_simulator.runSeconds(5.f);
 
@@ -274,7 +288,7 @@ TEST_F(EkfFlowTest, yawMotionCorrectionWithFlowGyroData)
 
 	// use flow sensor gyro data
 	// for clarification of the sign, see definition of flowSample
-	flow_sample.gyro_xyz = -body_rate * flow_sample.dt;
+	flow_sample.gyro_rate = -body_rate;
 
 	_sensor_simulator._flow.setData(flow_sample);
 	_sensor_simulator._imu.setGyroData(body_rate);

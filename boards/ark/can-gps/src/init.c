@@ -151,14 +151,12 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 
 	if (result != OK) {
 		syslog(LOG_ERR, "[boot] FAILED to init params in FLASH %d\n", result);
-		return -ENODEV;
 	}
 
 #endif // FLASH_BASED_PARAMS
 
 	/* Configure the HW based on the manifest */
-
-	px4_platform_configure();
+	//px4_platform_configure();
 
 	return OK;
 }

@@ -173,12 +173,6 @@
 	 (1 << ADC1_SPARE_1_CHANNEL))
 #endif
 
-/* Define Battery 1 Voltage Divider and A per V
- */
-
-#define BOARD_BATTERY1_V_DIV         (18.1f)     /* measured with the provided PM board */
-#define BOARD_BATTERY1_A_PER_V       (36.367515152f)
-
 /* HW has to large of R termination on ADC todo:change when HW value is chosen */
 
 #define BOARD_ADC_OPEN_CIRCUIT_V     (5.6f)
@@ -191,9 +185,11 @@
 #define GPIO_HW_REV_SENSE    /* PC3   */ ADC1_GPIO(13)
 #define GPIO_HW_VER_DRIVE    /* PG0   */ (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_SET|GPIO_PORTG|GPIO_PIN0)
 #define GPIO_HW_VER_SENSE    /* PC2   */ ADC1_GPIO(12)
-#define HW_INFO_INIT         {'V','5','x', 'x',0}
-#define HW_INFO_INIT_VER     2
-#define HW_INFO_INIT_REV     3
+#define HW_INFO_INIT_PREFIX         "VPIX32V5"
+
+#define VPIX32V500   HW_VER_REV(0x0,0x0) // PIX32V5           Rev 0
+#define VPIX32V540   HW_VER_REV(0x4,0x0) // HolyBro mini no can 2,3
+
 /* CAN Silence
  *
  * Silent mode control \ ESC Mux select
@@ -342,11 +338,11 @@
 /* SD card bringup does not work if performed on the IDLE thread because it
  * will cause waiting.  Use either:
  *
- *  CONFIG_LIB_BOARDCTL=y, OR
+ *  CONFIG_BOARDCTL=y, OR
  *  CONFIG_BOARD_INITIALIZE=y && CONFIG_BOARD_INITTHREAD=y
  */
 
-#if defined(CONFIG_BOARD_INITIALIZE) && !defined(CONFIG_LIB_BOARDCTL) && \
+#if defined(CONFIG_BOARD_INITIALIZE) && !defined(CONFIG_BOARDCTL) && \
    !defined(CONFIG_BOARD_INITTHREAD)
 #  warning SDIO initialization cannot be perfomed on the IDLE thread
 #endif
@@ -436,7 +432,6 @@
 
 #define BOARD_NUM_IO_TIMERS 5
 
-#define BOARD_DSHOT_MOTOR_ASSIGNMENT {3, 2, 1, 0, 4, 5, 6, 7, 8, 9, 10};
 
 __BEGIN_DECLS
 

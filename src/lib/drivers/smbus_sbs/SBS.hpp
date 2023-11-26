@@ -47,8 +47,7 @@
 #include <lib/drivers/smbus/SMBus.hpp>
 #include <uORB/topics/battery_status.h>
 #include <px4_platform_common/param.h>
-#include <geo/geo.h>
-
+#include <lib/atmosphere/atmosphere.h>
 
 using namespace time_literals;
 
@@ -69,7 +68,7 @@ public:
 
 	int populate_smbus_data(battery_status_s &msg);
 
-	virtual void RunImpl(); // Can be overriden by derived implimentation
+	virtual void RunImpl(); // Can be overridden by derived implimentation
 
 	virtual void custom_method(const BusCLIArguments &cli) = 0; //Has be overriden by derived implimentation
 
@@ -81,7 +80,7 @@ public:
 
 	/**
 	* @brief Read info from battery on startup.
-	* @return Returns PX4_OK on success, PX4_ERROR on failure. Can be overriden by derived implimentation
+	* @return Returns PX4_OK on success, PX4_ERROR on failure. Can be overridden by derived implimentation
 	*/
 	virtual int get_startup_info();
 
@@ -292,7 +291,7 @@ int SMBUS_SBS_BaseClass<T>::populate_smbus_data(battery_status_s &data)
 
 	// Read battery temperature and covert to Celsius.
 	ret |= _interface->read_word(BATT_SMBUS_TEMP, result);
-	data.temperature = ((float)result * 0.1f) + CONSTANTS_ABSOLUTE_NULL_CELSIUS;
+	data.temperature = ((float)result * 0.1f) + atmosphere::kAbsoluteNullCelsius;
 
 	return ret;
 

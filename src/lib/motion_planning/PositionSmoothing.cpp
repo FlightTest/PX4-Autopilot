@@ -38,9 +38,10 @@
 #include <matrix/matrix/helper_functions.hpp>
 
 
-void PositionSmoothing::generateSetpoints(
+void PositionSmoothing::_generateSetpoints(
 	const Vector3f &position,
 	const Vector3f(&waypoints)[3],
+	bool is_single_waypoint,
 	const Vector3f &feedforward_velocity,
 	float delta_time,
 	bool force_zero_velocity_setpoint,
@@ -49,7 +50,7 @@ void PositionSmoothing::generateSetpoints(
 	Vector3f velocity_setpoint{0.f, 0.f, 0.f};
 
 	if (!force_zero_velocity_setpoint) {
-		velocity_setpoint = _generateVelocitySetpoint(position, waypoints, feedforward_velocity);
+		velocity_setpoint = _generateVelocitySetpoint(position, waypoints, is_single_waypoint, feedforward_velocity);
 	}
 
 	out_setpoints.unsmoothed_velocity = velocity_setpoint;
@@ -82,26 +83,6 @@ bool PositionSmoothing::_isTurning(const Vector3f &target) const
 		&& cos_align < 0.98f
 		&& pos_to_target.longerThan(_target_acceptance_radius));
 }
-
-
-
-/* Constrain some value vith a constrain depending on the sign of the constraint
- * Example: 	- if the constrain is -5, the value will be constrained between -5 and 0
- * 		- if the constrain is 5, the value will be constrained between 0 and 5
- */
-inline float _constrainOneSide(float val, float constraint)
-{
-	const float min = (constraint < FLT_EPSILON) ? constraint : 0.f;
-	const float max = (constraint > FLT_EPSILON) ? constraint : 0.f;
-
-	return math::constrain(val, min, max);
-}
-
-inline float _constrainAbs(float val, float max)
-{
-	return matrix::sign(val) * math::min(fabsf(val), fabsf(max));
-}
-
 
 float PositionSmoothing::_getMaxXYSpeed(const Vector3f(&waypoints)[3]) const
 {
@@ -153,21 +134,20 @@ const Vector3f PositionSmoothing::_getCrossingPoint(const Vector3f &position, co
 	}
 
 	// Get the crossing point using L1-style guidance
-	auto l1_point = _getL1Point(position, waypoints);
-	return {l1_point(0), l1_point(1), target(2)};
+	return _getL1Point(position, waypoints);
 }
 
-const Vector2f PositionSmoothing::_getL1Point(const Vector3f &position, const Vector3f(&waypoints)[3]) const
+const Vector3f PositionSmoothing::_getL1Point(const Vector3f &position, const Vector3f(&waypoints)[3]) const
 {
-	const Vector2f pos_traj(_trajectory[0].getCurrentPosition(),
-				_trajectory[1].getCurrentPosition());
-	const Vector2f u_prev_to_target = Vector2f(waypoints[1] - waypoints[0]).unit_or_zero();
-	const Vector2f prev_to_pos(pos_traj - Vector2f(waypoints[0]));
-	const Vector2f prev_to_closest(u_prev_to_target * (prev_to_pos * u_prev_to_target));
-	const Vector2f closest_pt = Vector2f(waypoints[0]) + prev_to_closest;
+	const Vector3f pos_traj(_trajectory[0].getCurrentPosition(), _trajectory[1].getCurrentPosition(),
+				_trajectory[2].getCurrentPosition());
+	const Vector3f u_prev_to_target = (waypoints[1] - waypoints[0]).unit_or_zero();
+	const Vector3f prev_to_pos(pos_traj - waypoints[0]);
+	const Vector3f prev_to_closest(u_prev_to_target * (prev_to_pos * u_prev_to_target));
+	const Vector3f closest_pt = waypoints[0] + prev_to_closest;
 
 	// Compute along-track error using L1 distance and cross-track error
-	const float crosstrack_error = Vector2f(closest_pt - pos_traj).length();
+	const float crosstrack_error = (closest_pt - pos_traj).length();
 
 	const float l1 = math::max(_target_acceptance_radius, 5.f);
 	float alongtrack_error = 0.f;
@@ -178,20 +158,19 @@ const Vector2f PositionSmoothing::_getL1Point(const Vector3f &position, const Ve
 	}
 
 	// Position of the point on the line where L1 intersect the line between the two waypoints
-	const Vector2f l1_point = closest_pt + alongtrack_error * u_prev_to_target;
-
-	return l1_point;
+	return closest_pt + alongtrack_error * u_prev_to_target;
 }
 
 const Vector3f PositionSmoothing::_generateVelocitySetpoint(const Vector3f &position, const Vector3f(&waypoints)[3],
+		bool is_single_waypoint,
 		const Vector3f &feedforward_velocity_setpoint)
 {
 	// Interface: A valid position setpoint generates a velocity target using conservative motion constraints.
 	// If a velocity is specified, that is used as a feedforward to track the position setpoint
 	// (ie. it assumes the position setpoint is moving at the specified velocity)
 	// If the position setpoints are set to NAN, the values in the velocity setpoints are used as velocity targets: nothing to do here.
-	auto &target = waypoints[1];
-	const bool xy_target_valid = PX4_ISFINITE(target(0)) && PX4_ISFINITE(target(1));
+	const Vector3f &target = waypoints[1];
+	const bool xy_target_valid = Vector2f(target).isAllFinite();
 	const bool z_target_valid = PX4_ISFINITE(target(2));
 
 	Vector3f velocity_setpoint = feedforward_velocity_setpoint;
@@ -201,13 +180,13 @@ const Vector3f PositionSmoothing::_generateVelocitySetpoint(const Vector3f &posi
 		Vector3f pos_traj(_trajectory[0].getCurrentPosition(),
 				  _trajectory[1].getCurrentPosition(),
 				  _trajectory[2].getCurrentPosition());
-
-		const Vector3f u_pos_traj_to_dest((_getCrossingPoint(position, waypoints) - pos_traj).unit_or_zero());
+		const Vector3f crossing_point = is_single_waypoint ? target : _getCrossingPoint(position, waypoints);
+		const Vector3f u_pos_traj_to_dest{(crossing_point - pos_traj).unit_or_zero()};
 
 		float xy_speed = _getMaxXYSpeed(waypoints);
 		const float z_speed = _getMaxZSpeed(waypoints);
 
-		if (_isTurning(target)) {
+		if (!is_single_waypoint && _isTurning(target)) {
 			// Limit speed during a turn
 			xy_speed = math::min(_max_speed_previous, xy_speed);
 
@@ -235,7 +214,8 @@ const Vector3f PositionSmoothing::_generateVelocitySetpoint(const Vector3f &posi
 
 		// Get various path specific vectors
 		Vector2f pos_traj(_trajectory[0].getCurrentPosition(), _trajectory[1].getCurrentPosition());
-		Vector2f pos_traj_to_dest_xy = Vector2f(_getCrossingPoint(position, waypoints)) - pos_traj;
+		Vector2f crossing_point = is_single_waypoint ? Vector2f(target) : Vector2f(_getCrossingPoint(position, waypoints));
+		Vector2f pos_traj_to_dest_xy = crossing_point - pos_traj;
 		Vector2f u_pos_traj_to_dest_xy(pos_traj_to_dest_xy.unit_or_zero());
 
 		float xy_speed = _getMaxXYSpeed(waypoints);
@@ -286,8 +266,7 @@ void PositionSmoothing::_generateTrajectory(
 	float delta_time,
 	PositionSmoothingSetpoints &out_setpoints)
 {
-	if (!PX4_ISFINITE(velocity_setpoint(0)) || !PX4_ISFINITE(velocity_setpoint(1))
-	    || !PX4_ISFINITE(velocity_setpoint(2))) {
+	if (!velocity_setpoint.isAllFinite()) {
 		return;
 	}
 

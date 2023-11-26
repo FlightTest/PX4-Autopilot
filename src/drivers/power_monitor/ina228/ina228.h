@@ -45,9 +45,7 @@
 #include <lib/perf/perf_counter.h>
 #include <battery/battery.h>
 #include <drivers/drv_hrt.h>
-#include <uORB/Subscription.hpp>
 #include <uORB/SubscriptionInterval.hpp>
-#include <uORB/topics/actuator_controls.h>
 #include <uORB/topics/parameter_update.h>
 #include <px4_platform_common/i2c_spi_buses.h>
 
@@ -216,7 +214,7 @@ using namespace time_literals;
 #define INA228_ENERGY_SHIFTS                  (0)
 #define INA228_ENERGY_MASK                    (UINT64_C(0xffffffffff) << INA228_ENERGY_SHIFTS)
 
-/* INA228 Energy Result (CHARGE) 40-bit Register (Address = Ah) [reset = 0h] */
+/* INA228 Charge Result (CHARGE) 40-bit Register (Address = Ah) [reset = 0h] */
 
 #define INA228_CHARGE_SHIFTS                 (0)
 #define INA228_CHARGE_MASK                   (UINT64_C(0xffffffffff) << INA228_CHARGE_SHIFTS)
@@ -352,10 +350,7 @@ private:
 	float             _current_lsb{_max_current / DN_MAX};
 	float             _power_lsb{25.0f * _current_lsb};
 
-	actuator_controls_s  _actuator_controls{};
-
 	Battery 		  _battery;
-	uORB::Subscription  _actuators_sub{ORB_ID(actuator_controls_0)};
 	uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update), 1_s};
 
 	int read(uint8_t address, int16_t &data);

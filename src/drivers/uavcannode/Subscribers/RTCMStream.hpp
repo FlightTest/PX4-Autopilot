@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2021 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2022 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -37,6 +37,7 @@
 
 #include <uavcan/equipment/gnss/RTCMStream.hpp>
 
+#include <lib/drivers/device/Device.hpp>
 #include <uORB/Publication.hpp>
 #include <uORB/topics/gps_inject_data.h>
 
@@ -80,15 +81,26 @@ public:
 private:
 	void callback(const uavcan::ReceivedDataStructure<uavcan::equipment::gnss::RTCMStream> &msg)
 	{
-		gps_inject_data_s gps_inject_data{};
+		// Don't republish a message from ourselves
+		if (msg.getSrcNodeID().get() != getNode().getNodeID().get()) {
+			gps_inject_data_s gps_inject_data{};
 
-		gps_inject_data.len = msg.data.size();
+			gps_inject_data.len = msg.data.size();
 
-		//gps_inject_data.flags = gps_rtcm_data_msg.flags;
-		memcpy(gps_inject_data.data, &msg.data[0], gps_inject_data.len);
+			memcpy(gps_inject_data.data, &msg.data[0], gps_inject_data.len);
 
-		gps_inject_data.timestamp = hrt_absolute_time();
-		_gps_inject_data_pub.publish(gps_inject_data);
+			gps_inject_data.timestamp = hrt_absolute_time();
+
+			union device::Device::DeviceId device_id;
+
+			device_id.devid_s.bus_type = device::Device::DeviceBusType::DeviceBusType_UAVCAN;
+			device_id.devid_s.address = msg.getSrcNodeID().get();
+			device_id.devid_s.devtype = DRV_GPS_DEVTYPE_UAVCAN;
+
+			gps_inject_data.device_id = device_id.devid;
+
+			_gps_inject_data_pub.publish(gps_inject_data);
+		}
 	}
 
 	uORB::Publication<gps_inject_data_s> _gps_inject_data_pub{ORB_ID(gps_inject_data)};

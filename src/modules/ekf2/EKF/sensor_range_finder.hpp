@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2020 Estimation and Control Library (ECL). All rights reserved.
+ *   Copyright (c) 2020-2023 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -12,7 +12,7 @@
  *    notice, this list of conditions and the following disclaimer in
  *    the documentation and/or other materials provided with the
  *    distribution.
- * 3. Neither the name ECL nor the names of its contributors may be
+ * 3. Neither the name PX4 nor the names of its contributors may be
  *    used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -58,7 +58,9 @@ public:
 	void runChecks(uint64_t current_time_us, const matrix::Dcmf &R_to_earth);
 	bool isHealthy() const override { return _is_sample_valid; }
 	bool isDataHealthy() const override { return _is_sample_ready && _is_sample_valid; }
+	bool isDataReady() const { return _is_sample_ready; }
 	bool isRegularlySendingData() const override { return _is_regularly_sending_data; }
+	bool isStuckDetectorEnabled() const { return _stuck_threshold > 0.f; }
 
 	void setSample(const rangeSample &sample)
 	{
@@ -105,6 +107,8 @@ public:
 	float getValidMinVal() const { return _rng_valid_min_val; }
 	float getValidMaxVal() const { return _rng_valid_max_val; }
 
+	void setFaulty(bool faulty = true) { _is_faulty = faulty; }
+
 private:
 	void updateSensorToEarthRotation(const matrix::Dcmf &R_to_earth);
 
@@ -122,12 +126,13 @@ private:
 	bool _is_sample_valid{};	///< true if range finder sample retrieved from buffer is valid
 	bool _is_regularly_sending_data{false}; ///< true if the interval between two samples is less than the maximum expected interval
 	uint64_t _time_last_valid_us{};	///< time the last range finder measurement was ready (uSec)
+	bool _is_faulty{false};         ///< the sensor should not be used anymore
 
 	/*
 	 * Stuck check
 	 */
 	bool _is_stuck{};
-	float _stuck_threshold{0.1f};	///< minimum variation in range finder reading required to declare a range finder 'unstuck' when readings recommence after being out of range (m)
+	float _stuck_threshold{0.1f};	///< minimum variation in range finder reading required to declare a range finder 'unstuck' when readings recommence after being out of range (m), set to zero to disable
 	float _stuck_min_val{};		///< minimum value for new rng measurement when being stuck
 	float _stuck_max_val{};		///< maximum value for new rng measurement when being stuck
 
@@ -140,7 +145,7 @@ private:
 	/*
 	 * Tilt check
 	 */
-	float _cos_tilt_rng_to_earth{};		///< 2,2 element of the rotation matrix from sensor frame to earth frame
+	float _cos_tilt_rng_to_earth{1.f};		///< 2,2 element of the rotation matrix from sensor frame to earth frame
 	float _range_cos_max_tilt{0.7071f};	///< cosine of the maximum tilt angle from the vertical that permits use of range finder and flow data
 	float _pitch_offset_rad{3.14f}; 		///< range finder tilt rotation about the Y body axis
 	float _sin_pitch_offset{0.0f}; 		///< sine of the range finder tilt rotation about the Y body axis

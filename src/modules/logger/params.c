@@ -60,6 +60,7 @@ PARAM_DEFINE_INT32(SDLOG_UTC_OFFSET, 0);
  * @value 1 from boot until disarm
  * @value 2 from boot until shutdown
  * @value 3 depending on AUX1 RC channel
+ * @value 4 from 1st armed until shutdown
  *
  * @reboot_required true
  * @group SD Logging
@@ -121,13 +122,14 @@ PARAM_DEFINE_INT32(SDLOG_MISSION, 0);
  * 3 : Topics for system identification (high rate actuator control and IMU data)
  * 4 : Full rates for analysis of fast maneuvers (RC, attitude, rates and actuators)
  * 5 : Debugging topics (debug_*.msg topics, for custom code)
- * 6 : Topics for sensor comparison (low rate raw IMU, Baro and Magnetomer data)
+ * 6 : Topics for sensor comparison (low rate raw IMU, Baro and magnetometer data)
  * 7 : Topics for computer vision and collision avoidance
  * 8 : Raw FIFO high-rate IMU (Gyro)
  * 9 : Raw FIFO high-rate IMU (Accel)
+ * 10: Logging of mavlink tunnel message (useful for payload communication debugging)
  *
  * @min 0
- * @max 1023
+ * @max 2047
  * @bit 0 Default set (general log analysis)
  * @bit 1 Estimator replay (EKF2)
  * @bit 2 Thermal calibration
@@ -138,6 +140,7 @@ PARAM_DEFINE_INT32(SDLOG_MISSION, 0);
  * @bit 7 Computer Vision and Avoidance
  * @bit 8 Raw FIFO high-rate IMU (Gyro)
  * @bit 9 Raw FIFO high-rate IMU (Accel)
+ * @bit 10 Mavlink tunnel message logging
  * @reboot_required true
  * @group SD Logging
  */

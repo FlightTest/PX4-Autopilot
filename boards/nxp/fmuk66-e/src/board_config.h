@@ -249,12 +249,6 @@ __END_DECLS
 	/* PTB6  ADC1_SE12 */  ADC1_GPIO(12),  \
 	/* PTB7  ADC1_SE13 */  ADC1_GPIO(13)
 
-
-
-#define BOARD_BATTERY1_V_DIV   (10.177939394f)
-#define BOARD_BATTERY1_A_PER_V (15.391030303f)
-
-
 /* User GPIOs
  *
  */
@@ -462,7 +456,7 @@ void board_peripheral_reset(int ms);
  *
  ************************************************************************************/
 
-#if defined(CONFIG_LIB_BOARDCTL) || defined(CONFIG_BOARD_INITIALIZE)
+#if defined(CONFIG_BOARDCTL) || defined(CONFIG_BOARD_INITIALIZE)
 int fmuk66_bringup(void);
 #endif
 

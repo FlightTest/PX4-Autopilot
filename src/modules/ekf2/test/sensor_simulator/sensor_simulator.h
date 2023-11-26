@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2019 ECL Development Team. All rights reserved.
+ *   Copyright (c) 2019-2023 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -65,7 +65,8 @@ using namespace sensor_simulator::sensor;
 
 struct sensor_info {
 	uint64_t timestamp{};
-	enum measurement_t {IMU, MAG, BARO, GPS, AIRSPEED, RANGE, FLOW, VISION, LANDING_STATUS} sensor_type = IMU;
+	enum class measurement_t {IMU, MAG, BARO, GPS, AIRSPEED, RANGE, FLOW, VISION, LANDING_STATUS} sensor_type =
+		measurement_t::IMU;
 	std::array<double, 10> sensor_data{};
 };
 

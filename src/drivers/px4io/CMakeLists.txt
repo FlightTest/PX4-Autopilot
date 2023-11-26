@@ -43,6 +43,7 @@ px4_add_module(
 		module.yaml
 	DEPENDS
 		arch_px4io_serial
+		button_publisher
 		circuit_breaker
 		mixer_module
 	)
@@ -50,9 +51,6 @@ px4_add_module(
 # include the px4io binary in ROMFS
 if(CONFIG_BOARD_IO)
 	message(STATUS "drivers/px4io: ROMFS including ${CONFIG_BOARD_IO}")
-
-	# ExternalProject_Add() with GIT_SUBMODULES "" initializes no submodules.
-	cmake_policy(SET CMP0097 NEW)
 
 	include(ExternalProject)
 

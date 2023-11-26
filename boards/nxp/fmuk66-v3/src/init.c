@@ -67,7 +67,7 @@
 #include <kinetis_lpuart.h>
 #include "board_config.h"
 
-#include "arm_arch.h"
+#include "arm_internal.h"
 #include <arch/board/board.h>
 
 #include <drivers/drv_hrt.h>
@@ -270,7 +270,6 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 
 	if (ret != OK) {
 		board_autoled_on(LED_RED);
-		return ret;
 	}
 
 #ifdef HAVE_AUTOMOUNTER
@@ -286,7 +285,6 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 
 	if (ret != OK) {
 		board_autoled_on(LED_RED);
-		return ret;
 	}
 
 #endif

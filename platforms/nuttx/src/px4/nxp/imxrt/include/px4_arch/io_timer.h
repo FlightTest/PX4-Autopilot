@@ -45,7 +45,11 @@
 #pragma once
 __BEGIN_DECLS
 /* configuration limits */
-#define MAX_IO_TIMERS			4
+#ifdef BOARD_NUM_IO_TIMERS
+#define MAX_IO_TIMERS     BOARD_NUM_IO_TIMERS
+#else
+#define MAX_IO_TIMERS     4
+#endif
 #define MAX_TIMER_IO_CHANNELS	16
 
 #define MAX_LED_TIMERS			2
@@ -62,7 +66,8 @@ typedef enum io_timer_channel_mode_t {
 	IOTimerChanMode_Trigger = 5,
 	IOTimerChanMode_Dshot   = 6,
 	IOTimerChanMode_LED     = 7,
-	IOTimerChanMode_Other   = 8,
+	IOTimerChanMode_PPS     = 8,
+	IOTimerChanMode_Other   = 9,
 	IOTimerChanModeSize
 } io_timer_channel_mode_t;
 
@@ -77,6 +82,7 @@ typedef uint16_t io_timer_channel_allocation_t; /* big enough to hold MAX_TIMER_
  */
 typedef struct io_timers_t {
 	uint32_t  base;                /* Base address of the timer */
+	uint32_t  submodle;            /* Which Submodule */
 	uint32_t  clock_register;      /* SIM_SCGCn */
 	uint32_t  clock_bit;           /* SIM_SCGCn bit pos */
 	uint32_t  vectorno;            /* IRQ number */
@@ -85,6 +91,8 @@ typedef struct io_timers_t {
 typedef struct io_timers_channel_mapping_element_t {
 	uint32_t first_channel_index;
 	uint32_t channel_count;
+	uint32_t lowest_timer_channel;
+	uint32_t channel_count_including_gaps;
 } io_timers_channel_mapping_element_t;
 
 /* mapping for each io_timers to timer_io_channels */
@@ -101,6 +109,7 @@ typedef struct timer_io_channels_t {
 	uint8_t   val_offset;          /* IMXRT_FLEXPWM_SM0VAL3_OFFSET or IMXRT_FLEXPWM_SM0VAL5_OFFSET */
 	uint8_t   sub_module;          /* 0 based sub module offset */
 	uint8_t   sub_module_bits;     /* LDOK and CLDOK bits */
+	uint8_t   timer_channel;       /* Unused */
 } timer_io_channels_t;
 
 #define SM0           0
@@ -110,6 +119,7 @@ typedef struct timer_io_channels_t {
 
 #define PWMA_VAL      IMXRT_FLEXPWM_SM0VAL3_OFFSET
 #define PWMB_VAL      IMXRT_FLEXPWM_SM0VAL5_OFFSET
+#define PWMX_VAL      IMXRT_FLEXPWM_SM0VAL0_OFFSET //FIXME
 
 
 typedef void (*channel_handler_t)(void *context, const io_timers_t *timer, uint32_t chan_index,

@@ -31,6 +31,7 @@
  *
  ****************************************************************************/
 
+#include <px4_platform_common/log.h>
 #include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
 
 namespace px4
@@ -38,7 +39,9 @@ namespace px4
 
 ScheduledWorkItem::~ScheduledWorkItem()
 {
-	ScheduleClear();
+	if (_call.arg != nullptr) {
+		ScheduleClear();
+	}
 }
 
 void ScheduledWorkItem::schedule_trampoline(void *arg)

@@ -52,17 +52,27 @@ extern void libtomcrypt_init(void);
 #define KEY_CACHE_LEN 16
 
 #ifndef SECMEM_ALLOC
-#define SECMEM_ALLOC malloc
+#define SECMEM_ALLOC XMALLOC
 #endif
 
 #ifndef SECMEM_FREE
-#define SECMEM_FREE free
+#define SECMEM_FREE XFREE
 #endif
+
+#define SHA256_HASHLEN 32
+#define OAEP_MAX_RSA_MODLEN 256  /* RSA2048 */
+#define OAEP_MAX_MSGLEN (OAEP_MAX_RSA_MODLEN - 2 * SHA256_HASHLEN - 2)
 
 /*
  * For now, this is just a dummy up/down counter for tracking open/close calls
  */
 static int crypto_open_count = 0;
+
+/*
+ * Status of libtomcrypt initialization. This is a large library, which
+ * is initialized & pulled in by linker only when it is actually used
+ */
+static bool tomcrypt_initialized = false;
 
 typedef struct {
 	size_t key_size;
@@ -75,6 +85,14 @@ typedef struct {
 	uint8_t nonce[24];
 	uint64_t ctr;
 } chacha20_context_t;
+
+static inline void initialize_tomcrypt(void)
+{
+	if (!tomcrypt_initialized) {
+		libtomcrypt_init();
+		tomcrypt_initialized = true;
+	}
+}
 
 /* Clear key cache */
 static void clear_key_cache(void)
@@ -135,7 +153,10 @@ void crypto_init()
 {
 	keystore_init();
 	clear_key_cache();
-	libtomcrypt_init();
+}
+
+void crypto_deinit()
+{
 }
 
 crypto_session_handle_t crypto_open(px4_crypto_algorithm_t algorithm)
@@ -156,7 +177,7 @@ crypto_session_handle_t crypto_open(px4_crypto_algorithm_t algorithm)
 
 	switch (algorithm) {
 	case CRYPTO_XCHACHA20: {
-			chacha20_context_t *context = malloc(sizeof(chacha20_context_t));
+			chacha20_context_t *context = XMALLOC(sizeof(chacha20_context_t));
 
 			if (!context) {
 				ret.handle = 0;
@@ -188,7 +209,7 @@ void crypto_close(crypto_session_handle_t *handle)
 	crypto_open_count--;
 	handle->handle = 0;
 	keystore_close(&handle->keystore_handle);
-	free(handle->context);
+	XFREE(handle->context);
 	handle->context = NULL;
 }
 
@@ -268,6 +289,8 @@ bool crypto_encrypt_data(crypto_session_handle_t handle,
 			unsigned long outlen = *cipher_size;
 			uint8_t *public_key = (uint8_t *)crypto_get_key_ptr(handle.keystore_handle, key_idx, &key_sz);
 			*cipher_size = 0;
+
+			initialize_tomcrypt();
 
 			if (public_key &&
 			    rsa_import(public_key, key_sz, &key) == CRYPT_OK) {
@@ -363,12 +386,22 @@ bool crypto_get_encrypted_key(crypto_session_handle_t handle,
 					  max_len);
 
 	} else {
-		// The key size, encrypted, is a multiple of minimum block size for the algorithm+key
-		size_t min_block = crypto_get_min_blocksize(handle, encryption_key_idx);
-		*max_len = key_sz / min_block * min_block;
+		switch (handle.algorithm) {
 
-		if (key_sz % min_block) {
-			*max_len += min_block;
+		case CRYPTO_RSA_OAEP:
+			/* The length is the RSA key modulus length, and the maximum plaintext
+			 * length is calculated from that. This is now just fixed for RSA2048,
+			 * but one could also parse the RSA key
+			 * (encryption_key_idx) here and calculate the lengths.
+			 */
+
+			*max_len = key_sz <= OAEP_MAX_MSGLEN ?  OAEP_MAX_RSA_MODLEN : 0;
+			ret = true;
+			break;
+
+		default:
+			*max_len = 0;
+			break;
 		}
 	}
 
@@ -406,22 +439,6 @@ size_t crypto_get_min_blocksize(crypto_session_handle_t handle, uint8_t key_idx)
 	switch (handle.algorithm) {
 	case CRYPTO_XCHACHA20:
 		ret = 64;
-		break;
-
-	case CRYPTO_RSA_OAEP: {
-			rsa_key enc_key;
-			unsigned pub_key_sz;
-			uint8_t *pub_key = (uint8_t *)crypto_get_key_ptr(handle.keystore_handle, key_idx, &pub_key_sz);
-
-			if (pub_key &&
-			    rsa_import(pub_key, pub_key_sz, &enc_key) == CRYPT_OK) {
-				ret = ltc_mp.unsigned_size(enc_key.N);
-				rsa_free(&enc_key);
-
-			} else {
-				ret = 0;
-			}
-		}
 		break;
 
 	default:

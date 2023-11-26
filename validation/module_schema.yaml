@@ -147,13 +147,14 @@ parameters:
                                 'bit/s', 'B/s',
                                 'deg', 'deg*1e7', 'deg/s',
                                 'celcius', 'gauss', 'gauss/s', 'mgauss', 'mgauss^2',
-                                'hPa', 'kg', 'kg/m^2', 'kg m^2',
+                                'hPa', 'kg', 'kg/m^2', 'kg m^2', 'kg/m^3',
                                 'mm', 'm', 'm/s', 'm^2', 'm/s^2', 'm/s^3', 'm/s^2/sqrt(Hz)', 'm/s/rad',
-                                'Ohm', 'V',
+                                'Ohm', 'V', 'A',
                                 'us', 'ms', 's',
                                 'S', 'A/%', '(m/s^2)^2',  'm/m',  'tan(rad)^2', '(m/s)^2', 'm/rad',
                                 'm/s^3/sqrt(Hz)', 'm/s/sqrt(Hz)', 's/(1000*PWM)', '%m/s', 'min', 'us/C', 
                                 'N/(m/s)', 'Nm/(rad/s)', 'Nm', 'N',
+                                'rpm',
                                 'normalized_thrust/s', 'normalized_thrust', 'norm', 'SD']
                         bit:
                             # description of all bits for type bitmask.
@@ -194,7 +195,7 @@ parameters:
                         volatile:
                             # Optional volatile flag. Set to true if the
                             # parameter can be changed by the system
-                            # automatially
+                            # automatically
                             type: boolean
                         reboot_required:
                             # set to true, if changing of the parameter requires
@@ -368,6 +369,33 @@ actuator_output:
                                         # ui only shows the param if this condition is true
                                         type: string
                                         regex: *condition_regex
+                    custom_params:
+                        type: list
+                        schema: &mixer_parameter
+                            type: dict
+                            schema:
+                                label:
+                                    type: string
+                                name:
+                                    # param name
+                                    type: string
+                                    required: true
+                                show_as:
+                                    type: string
+                                    allowed: [ 'bitset', 'true-if-positive' ]
+                                show_if:
+                                    # condition
+                                    type: string
+                                    regex: *condition_regex
+                                index_offset:
+                                    type: integer
+                                advanced:
+                                    type: integer
+                                function:
+                                    type: string
+                                identifier:
+                                    # for rules
+                                    type: string
                     extra_function_groups:
                         # Additional function groups to add, defined in output_functions.yaml
                         type: list
@@ -476,28 +504,10 @@ mixer:
                     per_item_parameters:
                         type: list
                         minlength: 1
-                        schema: &mixer_parameter
-                            type: dict
-                            schema:
-                                label:
-                                    type: string
-                                name:
-                                    # param name
-                                    type: string
-                                    required: true
-                                show_as:
-                                    type: string
-                                    allowed: [ 'bitset', 'true-if-positive' ]
-                                show_if:
-                                    # condition
-                                    type: string
-                                    regex: *condition_regex
-                                index_offset:
-                                    type: integer
-                                advanced:
-                                    type: integer
-                                function:
-                                    type: string
+                        schema: *mixer_parameter
+        rules:
+            # mixer rules, validated by the mavlink actuator component information schema
+            type: list
         config:
             # Airframe types
             type: dict
@@ -518,6 +528,8 @@ mixer:
                                 # show type-specific functionality)
                                 type: string
                                 allowed: [ multirotor ]
+                            title:
+                                type: string
                             actuators:
                                 type: list
                                 minlength: 1
@@ -526,11 +538,20 @@ mixer:
                                     schema:
                                         actuator_type:
                                             type: string
+                                        group_label:
+                                            type: string
                                         count:
                                             # param name or fixed count
                                             oneof:
                                               - type: string
                                               - type: integer
+                                        item_label_prefix:
+                                            # optional per-item label prefix list or (indexed) string
+                                            oneof:
+                                              - type: list
+                                                schema:
+                                                    type: string
+                                              - type: string
                                         parameters:
                                             type: list
                                             minlength: 1
@@ -548,6 +569,8 @@ mixer:
                                                             schema:
                                                                 # position param names
                                                                 type: string
+                                                        index_offset:
+                                                            type: integer
                                                 extra:
                                                     type: list
                                                     schema: *mixer_parameter

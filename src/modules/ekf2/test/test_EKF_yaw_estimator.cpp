@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2021 ECL Development Team. All rights reserved.
+ *   Copyright (c) 2021-2023 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -58,7 +58,12 @@ public:
 	// Setup the Ekf with mag aiding disabled
 	void SetUp() override
 	{
+		// run briefly to init, then manually set in air and at rest (default for a real vehicle)
 		_ekf->init(0);
+		_sensor_simulator.runSeconds(0.1);
+		_ekf->set_in_air_status(false);
+		_ekf->set_vehicle_at_rest(true);
+
 		_ekf_wrapper.setMagFuseTypeNone();
 		_sensor_simulator.runSeconds(2);
 		_ekf_wrapper.enableGpsFusion();
@@ -101,10 +106,10 @@ TEST_F(EKFYawEstimatorTest, inAirYawAlignment)
 	EXPECT_NEAR(yaw_est, yaw, tolerance_rad);
 	EXPECT_LT(yaw_est_var, tolerance_rad);
 
-	// 2 resets: 1 after IMU+GNSS yaw alignment and 1 when starting GNSS aiding
+	// 1 reset when starting GNSS aiding
 	reset_logging_checker.capturePostResetState();
-	EXPECT_TRUE(reset_logging_checker.isHorizontalVelocityResetCounterIncreasedBy(2));
-	EXPECT_TRUE(reset_logging_checker.isHorizontalPositionResetCounterIncreasedBy(2));
+	EXPECT_TRUE(reset_logging_checker.isHorizontalVelocityResetCounterIncreasedBy(1));
+	EXPECT_TRUE(reset_logging_checker.isHorizontalPositionResetCounterIncreasedBy(1));
 
 	EXPECT_TRUE(_ekf->local_position_is_valid());
 	EXPECT_TRUE(_ekf->global_position_is_valid());

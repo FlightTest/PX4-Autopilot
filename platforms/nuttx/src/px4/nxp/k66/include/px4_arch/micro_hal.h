@@ -41,7 +41,7 @@ __BEGIN_DECLS
 
 // Fixme: using ??
 #define PX4_BBSRAM_SIZE             2048
-#define PX4_BBSRAM_GETDESC_IOCTL    0
+#define PX4_HF_GETDESC_IOCTL        0
 #define PX4_NUMBER_I2C_BUSES        KINETIS_NI2C
 
 #define GPIO_OUTPUT_SET             GPIO_OUTPUT_ONE
@@ -109,6 +109,7 @@ int kinetis_gpiosetevent(uint32_t pinset, bool risingedge, bool fallingedge, boo
 
 #define _PX4_MAKE_GPIO(pin_ftmx, io)    ((((uint32_t)(pin_ftmx)) & ~(_PIN_MODE_MASK | _PIN_OPTIONS_MASK)) |(io))
 #define PX4_MAKE_GPIO_INPUT(gpio) _PX4_MAKE_GPIO(gpio, GPIO_PULLUP)
+#define PX4_MAKE_GPIO_EXTI(gpio) _PX4_MAKE_GPIO(gpio, PIN_INT_BOTH | GPIO_PULLUP)
 #define PX4_MAKE_GPIO_OUTPUT_SET(gpio) _PX4_MAKE_GPIO(gpio, GPIO_HIGHDRIVE)
 #define PX4_MAKE_GPIO_OUTPUT_CLEAR(gpio) _PX4_MAKE_GPIO(gpio, GPIO_LOWDRIVE)
 

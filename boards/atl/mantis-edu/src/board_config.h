@@ -59,6 +59,13 @@
 #define BOARD_ARMED_STATE_LED  LED_BLUE
 
 #define FLASH_BASED_PARAMS
+#define RAM_BASED_MISSIONS
+
+// Hacks for MAVLink RC button input
+#define ATL_MANTIS_RC_INPUT_HACKS
+
+// Hacks for MAVLink RC button input
+#define ATL_MANTIS_RC_INPUT_HACKS
 
 /*
  * ADC channels
@@ -98,9 +105,6 @@
 	 (1 << ADC_HW_REV_SENSE_CHANNEL)           | \
 	 (1 << ADC1_SPARE_1_CHANNEL))
 
-/* Define Battery 1 Voltage Divider and A per V */
-#define BOARD_BATTERY1_V_DIV         (9.0f)     /* measured with the provided PM board */
-
 /* HW has to large of R termination on ADC todo:change when HW value is chosen */
 #define BOARD_ADC_OPEN_CIRCUIT_V     (5.6f)
 
@@ -111,9 +115,7 @@
 #define GPIO_HW_REV_SENSE    /* PC3   */ ADC1_GPIO(13)
 #define GPIO_HW_VER_DRIVE    /* PG0   */ (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_SET|GPIO_PORTG|GPIO_PIN0)
 #define GPIO_HW_VER_SENSE    /* PC2   */ ADC1_GPIO(12)
-#define HW_INFO_INIT         {'V','5','x', 'x',0}
-#define HW_INFO_INIT_VER     2
-#define HW_INFO_INIT_REV     3
+#define HW_INFO_INIT_PREFIX    "VAM"
 
 #define BOARD_TAP_ESC_MODE 2 // select closed-loop control mode for the esc
 // #define BOARD_USE_ESC_CURRENT_REPORT
@@ -147,9 +149,8 @@
 #define RC_SERIAL_PORT                     "/dev/ttyS5"
 #define RC_SERIAL_SINGLEWIRE
 
-#define BOARD_HAS_POWER_CONTROL	1
 /* power on/off */
-#define MS_PWR_BUTTON_DOWN 1500
+#define MS_PWR_BUTTON_DOWN 750
 #define KEY_AD_GPIO    (GPIO_INPUT|GPIO_PULLUP|GPIO_EXTI|GPIO_PORTC|GPIO_PIN4)
 #define POWER_ON_GPIO  (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_SET|GPIO_PORTC|GPIO_PIN5)
 #define POWER_OFF_GPIO (GPIO_INPUT|GPIO_PULLDOWN|GPIO_PORTC|GPIO_PIN5)

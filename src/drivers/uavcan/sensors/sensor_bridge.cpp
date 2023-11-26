@@ -38,18 +38,43 @@
 #include "sensor_bridge.hpp"
 #include <cassert>
 
-#include "differential_pressure.hpp"
-#include "baro.hpp"
-#include "battery.hpp"
-#include "airspeed.hpp"
-#include "gnss.hpp"
-#include "flow.hpp"
-#include "mag.hpp"
-#include "rangefinder.hpp"
+#if defined(CONFIG_UAVCAN_SENSOR_ACCEL)
 #include "accel.hpp"
 #include "gyro.hpp"
-#include "cbat.hpp"
+#endif
+#if defined(CONFIG_UAVCAN_SENSOR_AIRSPEED)
+#include "airspeed.hpp"
+#endif
+#if defined(CONFIG_UAVCAN_SENSOR_BARO)
+#include "baro.hpp"
+#endif
+#if defined(CONFIG_UAVCAN_SENSOR_BATTERY)
+#include "battery.hpp"
+#endif
+#if defined(CONFIG_UAVCAN_SENSOR_DIFFERENTIAL_PRESSURE)
+#include "differential_pressure.hpp"
+#endif
+#if defined(CONFIG_UAVCAN_SENSOR_FLOW)
+#include "flow.hpp"
+#endif
+#if defined(CONFIG_UAVCAN_SENSOR_GNSS)
+#include "gnss.hpp"
+#endif
+#if defined(CONFIG_UAVCAN_SENSOR_HYGROMETER)
+#include "hygrometer.hpp"
+#endif
+#if defined(CONFIG_UAVCAN_SENSOR_ICE_STATUS)
 #include "ice_status.hpp"
+#endif
+#if defined(CONFIG_UAVCAN_SENSOR_MAG)
+#include "mag.hpp"
+#endif
+#if defined(CONFIG_UAVCAN_SENSOR_RANGEFINDER)
+#include "rangefinder.hpp"
+#endif
+#if defined(CONFIG_UAVCAN_SENSOR_SAFETY_BUTTON)
+#include "safety_button.hpp"
+#endif
 
 /*
  * IUavcanSensorBridge
@@ -57,6 +82,7 @@
 void IUavcanSensorBridge::make_all(uavcan::INode &node, List<IUavcanSensorBridge *> &list)
 {
 	// airspeed
+#if defined(CONFIG_UAVCAN_SENSOR_AIRSPEED)
 	int32_t uavcan_sub_aspd = 1;
 	param_get(param_find("UAVCAN_SUB_ASPD"), &uavcan_sub_aspd);
 
@@ -64,6 +90,9 @@ void IUavcanSensorBridge::make_all(uavcan::INode &node, List<IUavcanSensorBridge
 		list.add(new UavcanAirspeedBridge(node));
 	}
 
+#endif
+
+#if defined(CONFIG_UAVCAN_SENSOR_BARO)
 	// baro
 	int32_t uavcan_sub_baro = 1;
 	param_get(param_find("UAVCAN_SUB_BARO"), &uavcan_sub_baro);
@@ -72,18 +101,21 @@ void IUavcanSensorBridge::make_all(uavcan::INode &node, List<IUavcanSensorBridge
 		list.add(new UavcanBarometerBridge(node));
 	}
 
+#endif
+
 	// battery
+#if defined(CONFIG_UAVCAN_SENSOR_BATTERY)
 	int32_t uavcan_sub_bat = 1;
 	param_get(param_find("UAVCAN_SUB_BAT"), &uavcan_sub_bat);
 
-	if (uavcan_sub_bat == 1) {
+	if (uavcan_sub_bat != 0) {
 		list.add(new UavcanBatteryBridge(node));
-
-	} else if (uavcan_sub_bat == 2) {
-		list.add(new UavcanCBATBridge(node));
 	}
 
+#endif
+
 	// differential pressure
+#if defined(CONFIG_UAVCAN_SENSOR_DIFFERENTIAL_PRESSURE)
 	int32_t uavcan_sub_dpres = 1;
 	param_get(param_find("UAVCAN_SUB_DPRES"), &uavcan_sub_dpres);
 
@@ -91,7 +123,10 @@ void IUavcanSensorBridge::make_all(uavcan::INode &node, List<IUavcanSensorBridge
 		list.add(new UavcanDifferentialPressureBridge(node));
 	}
 
+#endif
+
 	// flow
+#if defined(CONFIG_UAVCAN_SENSOR_FLOW)
 	int32_t uavcan_sub_flow = 1;
 	param_get(param_find("UAVCAN_SUB_FLOW"), &uavcan_sub_flow);
 
@@ -99,7 +134,10 @@ void IUavcanSensorBridge::make_all(uavcan::INode &node, List<IUavcanSensorBridge
 		list.add(new UavcanFlowBridge(node));
 	}
 
+#endif
+
 	// GPS
+#if defined(CONFIG_UAVCAN_SENSOR_GNSS)
 	int32_t uavcan_sub_gps = 1;
 	param_get(param_find("UAVCAN_SUB_GPS"), &uavcan_sub_gps);
 
@@ -107,7 +145,21 @@ void IUavcanSensorBridge::make_all(uavcan::INode &node, List<IUavcanSensorBridge
 		list.add(new UavcanGnssBridge(node));
 	}
 
+#endif
+
+	// hygrometer
+#if defined(CONFIG_UAVCAN_SENSOR_HYGROMETER)
+	int32_t uavcan_sub_hygro = 1;
+	param_get(param_find("UAVCAN_SUB_HYGRO"), &uavcan_sub_hygro);
+
+	if (uavcan_sub_hygro != 0) {
+		list.add(new UavcanHygrometerBridge(node));
+	}
+
+#endif
+
 	// ice (internal combustion engine)
+#if defined(CONFIG_UAVCAN_SENSOR_ICE_STATUS)
 	int32_t uavcan_sub_ice = 1;
 	param_get(param_find("UAVCAN_SUB_ICE"), &uavcan_sub_ice);
 
@@ -115,7 +167,10 @@ void IUavcanSensorBridge::make_all(uavcan::INode &node, List<IUavcanSensorBridge
 		list.add(new UavcanIceStatusBridge(node));
 	}
 
+#endif
+
 	// IMU
+#if defined(CONFIG_UAVCAN_SENSOR_ACCEL)
 	int32_t uavcan_sub_imu = 1;
 	param_get(param_find("UAVCAN_SUB_IMU"), &uavcan_sub_imu);
 
@@ -124,7 +179,10 @@ void IUavcanSensorBridge::make_all(uavcan::INode &node, List<IUavcanSensorBridge
 		list.add(new UavcanGyroBridge(node));
 	}
 
+#endif
+
 	// magnetometer
+#if defined(CONFIG_UAVCAN_SENSOR_MAG)
 	int32_t uavcan_sub_mag = 1;
 	param_get(param_find("UAVCAN_SUB_MAG"), &uavcan_sub_mag);
 
@@ -132,13 +190,30 @@ void IUavcanSensorBridge::make_all(uavcan::INode &node, List<IUavcanSensorBridge
 		list.add(new UavcanMagnetometerBridge(node));
 	}
 
+#endif
+
 	// range finder
+#if defined(CONFIG_UAVCAN_SENSOR_RANGEFINDER)
 	int32_t uavcan_sub_rng = 1;
 	param_get(param_find("UAVCAN_SUB_RNG"), &uavcan_sub_rng);
 
 	if (uavcan_sub_rng != 0) {
 		list.add(new UavcanRangefinderBridge(node));
 	}
+
+#endif
+
+	// safety button
+
+#if defined(CONFIG_UAVCAN_SENSOR_SAFETY_BUTTON)
+	int32_t uavcan_sub_button = 1;
+	param_get(param_find("UAVCAN_SUB_BTN"), &uavcan_sub_button);
+
+	if (uavcan_sub_button != 0) {
+		list.add(new UavcanSafetyButtonBridge(node));
+	}
+
+#endif
 }
 
 /*

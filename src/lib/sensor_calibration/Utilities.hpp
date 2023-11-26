@@ -50,7 +50,17 @@ namespace calibration
  * @param device_id
  * @return int8_t Valid calibration index on success, -1 otherwise
  */
-int8_t FindCalibrationIndex(const char *sensor_type, uint32_t device_id);
+int8_t FindCurrentCalibrationIndex(const char *sensor_type, uint32_t device_id);
+
+/**
+ * @brief Find sensor's calibration index if it exists, otherwise select an available slot.
+ *
+ * @param sensor_type Calibration parameter abbreviated sensor string ("ACC", "GYRO", "MAG")
+ * @param device_id
+ * @param preferred_index preferred index (optional)
+ * @return int8_t Valid calibration index on success, -1 otherwise
+ */
+int8_t FindAvailableCalibrationIndex(const char *sensor_type, uint32_t device_id, int8_t preferred_index = -1);
 
 /**
  * @brief Get sensor calibration parameter value.
@@ -78,7 +88,7 @@ bool SetCalibrationParam(const char *sensor_type, const char *cal_type, uint8_t 
 	char str[20] {};
 
 	// eg CAL_MAGn_ID/CAL_MAGn_ROT
-	sprintf(str, "CAL_%s%u_%s", sensor_type, instance, cal_type);
+	snprintf(str, sizeof(str), "CAL_%s%u_%s", sensor_type, instance, cal_type);
 
 	int ret = param_set_no_notification(param_find(str), &value);
 
@@ -131,5 +141,12 @@ Rotation GetBoardRotation();
  * @return matrix::Dcmf
  */
 matrix::Dcmf GetBoardRotationMatrix();
+
+/**
+ * @brief Determine if device is on an external bus
+ *
+ * @return true if device is on an external bus
+ */
+bool DeviceExternal(uint32_t device_id);
 
 } // namespace calibration

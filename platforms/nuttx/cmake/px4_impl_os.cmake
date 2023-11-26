@@ -64,10 +64,21 @@ function(px4_os_add_flags)
 		${PX4_SOURCE_DIR}/platforms/nuttx/NuttX/apps/include
 	)
 
-	# prevent using the toolchain's std c++ library
-	add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-nostdinc++>)
 
-	add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-fno-sized-deallocation>)
+	set(cxx_flags)
+	list(APPEND cxx_flags
+		-fno-exceptions
+		-fno-rtti
+		-fno-sized-deallocation
+		-fno-threadsafe-statics
+		-nostdinc++ # prevent using the toolchain's std c++ library
+	)
+
+	foreach(flag ${cxx_flags})
+		add_compile_options($<$<COMPILE_LANGUAGE:CXX>:${flag}>)
+	endforeach()
+
+	add_compile_options($<$<COMPILE_LANGUAGE:C>:-Wbad-function-cast>)
 
 	add_definitions(
 		-D__PX4_NUTTX
@@ -82,7 +93,7 @@ function(px4_os_add_flags)
 			-ffixed-r10
 			-finstrument-functions
 			# instrumenting PX4 Matrix and Param methods is too burdensome
-			-finstrument-functions-exclude-file-list=matrix/Matrix.hpp,px4_platform_common/param.h
+			-finstrument-functions-exclude-file-list=matrix/Matrix.hpp,px4_platform_common/param.h,modules__ekf2_unity.cpp
 		)
 	endif()
 
@@ -128,9 +139,15 @@ function(px4_os_determine_build_chip)
 	elseif(CONFIG_ARCH_CHIP_MIMXRT1062DVL6A)
 		set(CHIP_MANUFACTURER "nxp")
 		set(CHIP "rt106x")
+	elseif(CONFIG_ARCH_CHIP_MIMXRT1176DVMAA)
+		set(CHIP_MANUFACTURER "nxp")
+		set(CHIP "rt117x")
 	elseif(CONFIG_ARCH_CHIP_S32K146)
 		set(CHIP_MANUFACTURER "nxp")
 		set(CHIP "s32k14x")
+	elseif(CONFIG_ARCH_CHIP_S32K344)
+		set(CHIP_MANUFACTURER "nxp")
+		set(CHIP "s32k34x")
 	elseif(CONFIG_ARCH_CHIP_RP2040)
 		set(CHIP_MANUFACTURER "rpi")
 		set(CHIP "rp2040")
@@ -177,7 +194,7 @@ function(px4_os_prebuild_targets)
 	endif()
 
 	add_library(prebuild_targets INTERFACE)
-	target_link_libraries(prebuild_targets INTERFACE nuttx_xx nuttx_c nuttx_fs nuttx_mm nuttx_sched m gcc)
+	target_link_libraries(prebuild_targets INTERFACE nuttx_xx m gcc)
 	add_dependencies(prebuild_targets DEPENDS nuttx_context uorb_headers)
 
 endfunction()

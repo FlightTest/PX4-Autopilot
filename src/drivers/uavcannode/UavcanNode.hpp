@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2015-2020 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2015-2022 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -66,7 +66,9 @@
 #include <lib/perf/perf_counter.h>
 
 #include <uORB/Subscription.hpp>
+#include <uORB/SubscriptionCallback.hpp>
 #include <uORB/SubscriptionInterval.hpp>
+#include <uORB/topics/log_message.h>
 #include <uORB/topics/parameter_update.h>
 
 #include "Publishers/UavcanPublisherBase.hpp"
@@ -118,7 +120,8 @@ public:
 	typedef UAVCAN_DRIVER::CanInitHelper<RxQueueLenPerIface> CanInitHelper;
 	typedef uavcan::protocol::file::BeginFirmwareUpdate BeginFirmwareUpdate;
 
-	UavcanNode(uavcan::ICanDriver &can_driver, uavcan::ISystemClock &system_clock);
+	UavcanNode(CanInitHelper *can_init, uint32_t bitrate, uavcan::ICanDriver &can_driver,
+		   uavcan::ISystemClock &system_clock);
 
 	virtual		~UavcanNode();
 
@@ -137,6 +140,9 @@ public:
 
 	/* The bit rate that can be passed back to the bootloader */
 	int32_t active_bitrate{0};
+	uint32_t _bitrate;
+
+	CanInitHelper *_can;
 
 private:
 	void Run() override;
@@ -146,7 +152,7 @@ private:
 
 	px4::atomic_bool	_task_should_exit{false};	///< flag to indicate to tear down the CAN driver
 
-	bool		_initialized{false};		///< number of actuators currently available
+	enum {Booted, Interfaced, Allocation, Allocated,  Done}		_init_state{Booted};		///< State of the boot.
 
 	static UavcanNode	*_instance;			///< singleton pointer
 
@@ -170,9 +176,12 @@ private:
 	IntrusiveSortedList<UavcanSubscriberBase *> _subscriber_list;
 
 	uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update), 1_s};
+	uORB::SubscriptionCallbackWorkItem _log_message_sub{this, ORB_ID(log_message)};
 
 	UavcanNodeParamManager _param_manager;
 	uavcan::ParamServer _param_server;
+
+	uavcan::DynamicNodeIDClient _dyn_node_id_client;
 
 	perf_counter_t _cycle_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": cycle time")};
 	perf_counter_t _interval_perf{perf_alloc(PC_INTERVAL, MODULE_NAME": cycle interval")};

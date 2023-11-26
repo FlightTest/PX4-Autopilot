@@ -8,7 +8,7 @@ class MarkdownTablesOutput():
         result = """# Airframes Reference
 
 :::note
-**This list is [auto-generated](https://github.com/PX4/PX4-Autopilot/blob/master/Tools/px4airframes/markdownout.py) from the source code** using the build command: `make airframe_metadata`.
+**This list is [auto-generated](https://github.com/PX4/PX4-Autopilot/blob/main/Tools/px4airframes/markdownout.py) from the source code** using the build command: `make airframe_metadata`.
 :::
 
 This page lists all supported airframes and types including the motor assignment and numbering.
@@ -51,9 +51,9 @@ div.frame_variant td, div.frame_variant th {
   text-align : left;
 }
 </style>\n\n"""
- 
+
         type_set = set()
-        
+
         if len(image_path) > 0 and image_path[-1] != '/':
             image_path = image_path + '/'
 
@@ -62,7 +62,7 @@ div.frame_variant td, div.frame_variant th {
                result += '## %s\n\n' % group.GetClass()
                type_set.add(group.GetClass())
 
-            result += '### %s\n\n' % group.GetName()
+            result += '### %s\n\n' % group.GetType()
 
             # Display an image of the frame
             image_name = group.GetImageName()
@@ -72,38 +72,27 @@ div.frame_variant td, div.frame_variant th {
 
             # check if all outputs are equal for the group: if so, show them
             # only once
-            outputs_prev = ['', ''] # split into MAINx and others (AUXx)
-            outputs_match = [True, True]
-            for param in group.GetParams():
-                if not self.IsExcluded(param, board):
-                    outputs_current = ['', '']
-                    for output_name in param.GetOutputCodes():
-                        value = param.GetOutputValue(output_name)
-                        if output_name.lower().startswith('main'):
-                            idx = 0
-                        else:
-                            idx = 1
-                        outputs_current[idx] += '<li><b>%s</b>: %s</li>' % (output_name, value)
-                    for i in range(2):
-                        if len(outputs_current[i]) != 0:
-                            if outputs_prev[i] == '':
-                                outputs_prev[i] = outputs_current[i]
-                            elif outputs_current[i] != outputs_prev[i]:
-                                outputs_match[i] = False
+            all_outputs = {}
+            num_configs = len(group.GetAirframes())
+            for airframe in group.GetAirframes():
+                if not self.IsExcluded(airframe, board):
+                    for output_name in airframe.GetOutputCodes():
+                        value = airframe.GetOutputValue(output_name)
+                        key_value_pair = (output_name, value)
+                        if key_value_pair not in all_outputs:
+                            all_outputs[key_value_pair] = 0
+                        all_outputs[key_value_pair] += 1
+            has_common_outputs = any(all_outputs[k] == num_configs for k in all_outputs)
 
-            for i in range(2):
-                if len(outputs_prev[i]) == 0:
-                    outputs_match[i] = False
-                if not outputs_match[i]:
-                    outputs_prev[i] = ''
-
-            if outputs_match[0] or outputs_match[1]:
+            if has_common_outputs:
+                outputs_common = ''.join(['<li><b>{:}</b>: {:}</li>'.format(k[0], k[1]) \
+                    for k in all_outputs if all_outputs[k] == num_configs])
                 result += '<table>\n'
                 result += ' <thead>\n'
                 result += '   <tr><th>Common Outputs</th></tr>\n'
                 result += ' </thead>\n'
                 result += ' <tbody>\n'
-                result += '<tr>\n <td><ul>%s%s</ul></td>\n</tr>\n' % (outputs_prev[0], outputs_prev[1])
+                result += '<tr>\n <td><ul>%s</ul></td>\n</tr>\n' % (outputs_common)
                 result += '</tbody></table>\n'
 
             result += '</div>\n\n'
@@ -115,18 +104,17 @@ div.frame_variant td, div.frame_variant th {
             result += ' </thead>\n'
             result += '<tbody>\n'
 
-            for param in group.GetParams():
-                if not self.IsExcluded(param, board):
-                    #print("generating: {0} {1}".format(param.GetName(), excluded))
-                    name = param.GetName()
-                    airframe_id = param.GetId()
+            for airframe in group.GetAirframes():
+                if not self.IsExcluded(airframe, board):
+                    name = airframe.GetName()
+                    airframe_id = airframe.GetId()
                     airframe_id_entry = '<p><code>SYS_AUTOSTART</code> = %s</p>' % (airframe_id)
-                    maintainer = param.GetMaintainer()
+                    maintainer = airframe.GetMaintainer()
                     maintainer_entry = ''
                     if maintainer != '':
                         maintainer_entry = 'Maintainer: %s' % (html.escape(maintainer))
-                    url = param.GetFieldValue('url')
-                    name_anchor='%s_%s_%s' % (group.GetClass(),group.GetName(),name)
+                    url = airframe.GetFieldValue('url')
+                    name_anchor='%s_%s_%s' % (group.GetClass(),group.GetType(),name)
                     name_anchor=name_anchor.replace(' ','_').lower()
                     name_anchor=name_anchor.replace('"','_').lower()
                     name_anchor='id="%s"' % name_anchor
@@ -135,14 +123,11 @@ div.frame_variant td, div.frame_variant th {
                         name_entry = '<a href="%s">%s</a>' % (url, name)
                     outputs = '<ul>'
                     has_outputs = False
-                    for output_name in param.GetOutputCodes():
-                        value = param.GetOutputValue(output_name)
+                    for output_name in airframe.GetOutputCodes():
+                        value = airframe.GetOutputValue(output_name)
                         valstrs = value.split(";")
-                        if output_name.lower().startswith('main'):
-                            idx = 0
-                        else:
-                            idx = 1
-                        if not outputs_match[idx]:
+                        key_value_pair = (output_name, value)
+                        if all_outputs[key_value_pair] < num_configs:
                             outputs += '<li><b>%s</b>: %s</li>' % (output_name, value)
                             has_outputs = True
 
@@ -166,9 +151,9 @@ div.frame_variant td, div.frame_variant th {
 
         self.output = result
 
-    def IsExcluded(self, param, board):
-        for code in param.GetArchCodes():
-            if "CONFIG_ARCH_BOARD_{0}".format(code) == board and param.GetArchValue(code) == "exclude":
+    def IsExcluded(self, airframe, board):
+        for code in airframe.GetArchCodes():
+            if "CONFIG_ARCH_BOARD_{0}".format(code) == board and airframe.GetArchValue(code) == "exclude":
                 return True
         return False
 

@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2019 Estimation and Control Library (ECL). All rights reserved.
+ *   Copyright (c) 2019-2023 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -12,7 +12,7 @@
  *    notice, this list of conditions and the following disclaimer in
  *    the documentation and/or other materials provided with the
  *    distribution.
- * 3. Neither the name ECL nor the names of its contributors may be
+ * 3. Neither the name PX4 nor the names of its contributors may be
  *    used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -48,15 +48,16 @@ using namespace estimator;
 class ImuDownSampler
 {
 public:
-	explicit ImuDownSampler(float target_dt_sec);
+	explicit ImuDownSampler(int32_t &target_dt_us);
 	~ImuDownSampler() = default;
 
 	bool update(const imuSample &imu_sample_new);
 
 	imuSample getDownSampledImuAndTriggerReset()
 	{
-		_do_reset = true;
-		return _imu_down_sampled;
+		imuSample imu{_imu_down_sampled};
+		reset();
+		return imu;
 	}
 
 private:
@@ -64,8 +65,15 @@ private:
 
 	imuSample _imu_down_sampled{};
 	Quatf _delta_angle_accumulated{};
-	const float _target_dt;  // [sec]
-	float _imu_collection_time_adj{0.f};
-	bool _do_reset{true};
+
+	int _accumulated_samples{0};
+	int _required_samples{1};
+
+	int32_t &_target_dt_us;
+
+	float _target_dt_s{0.010f};
+	float _min_dt_s{0.005f};
+
+	float _delta_ang_dt_avg{0.005f};
 };
 #endif // !EKF_IMU_DOWN_SAMPLER_HPP

@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2018, 2021 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2018-2021 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -40,16 +40,14 @@
  */
 
 #include "camera_capture.hpp"
+#include <px4_platform_common/events.h>
+#include <systemlib/mavlink_log.h>
 
 #include <board_config.h>
 
-#ifdef BOARD_WITH_IO
-# define PARAM_PREFIX "PWM_AUX"
-#else
-# define PARAM_PREFIX "PWM_MAIN"
-#endif
-
 #define commandParamToInt(n) static_cast<int>(n >= 0 ? n + 0.5f : n - 0.5f)
+
+using namespace time_literals;
 
 namespace camera_capture
 {
@@ -73,28 +71,18 @@ CameraCapture::CameraCapture() :
 	_p_camera_capture_edge = param_find("CAM_CAP_EDGE");
 	param_get(_p_camera_capture_edge, &_camera_capture_edge);
 
-
 	// get the capture channel from function configuration params
-	param_t p_ctrl_alloc = param_find("SYS_CTRL_ALLOC");
-	int32_t ctrl_alloc = 0;
+	_capture_channel = -1;
 
-	if (p_ctrl_alloc != PARAM_INVALID) {
-		param_get(p_ctrl_alloc, &ctrl_alloc);
-	}
+	for (unsigned i = 0; i < 16 && _capture_channel == -1; ++i) {
+		char param_name[17];
+		snprintf(param_name, sizeof(param_name), "%s_%s%d", PARAM_PREFIX, "FUNC", i + 1);
+		param_t function_handle = param_find(param_name);
+		int32_t function;
 
-	if (ctrl_alloc == 1) {
-		_capture_channel = -1;
-
-		for (unsigned i = 0; i < 16 && _capture_channel == -1; ++i) {
-			char param_name[17];
-			snprintf(param_name, sizeof(param_name), "%s_%s%d", PARAM_PREFIX, "FUNC", i + 1);
-			param_t function_handle = param_find(param_name);
-			int32_t function;
-
-			if (function_handle != PARAM_INVALID && param_get(function_handle, &function) == 0) {
-				if (function == 2032) { // Camera_Capture
-					_capture_channel = i;
-				}
+		if (function_handle != PARAM_INVALID && param_get(function_handle, &function) == 0) {
+			if (function == 2032) { // Camera_Capture
+				_capture_channel = i;
 			}
 		}
 	}
@@ -110,8 +98,23 @@ CameraCapture::~CameraCapture()
 void
 CameraCapture::capture_callback(uint32_t chan_index, hrt_abstime edge_time, uint32_t edge_state, uint32_t overflow)
 {
+	// Maximum acceptable rate is 5kHz
+	if ((edge_time - _trigger.hrt_edge_time) < 200_us) {
+		++_trigger_rate_exceeded_counter;
+
+		if (_trigger_rate_exceeded_counter > 100) {
+
+			// Trigger rate too high, stop future interrupts
+			up_input_capture_set(_capture_channel, Disabled, 0, nullptr, nullptr);
+			_trigger_rate_failure.store(true);
+		}
+
+	} else if (_trigger_rate_exceeded_counter > 0) {
+		--_trigger_rate_exceeded_counter;
+	}
+
 	_trigger.chan_index = chan_index;
-	_trigger.edge_time = edge_time;
+	_trigger.hrt_edge_time = edge_time;
 	_trigger.edge_state = edge_state;
 	_trigger.overflow = overflow;
 
@@ -124,7 +127,7 @@ CameraCapture::gpio_interrupt_routine(int irq, void *context, void *arg)
 	CameraCapture *dev = static_cast<CameraCapture *>(arg);
 
 	dev->_trigger.chan_index = 0;
-	dev->_trigger.edge_time = hrt_absolute_time();
+	dev->_trigger.hrt_edge_time = hrt_absolute_time();
 	dev->_trigger.edge_state = 0;
 	dev->_trigger.overflow = 0;
 
@@ -146,23 +149,31 @@ CameraCapture::publish_trigger()
 {
 	bool publish = false;
 
+	if (_trigger_rate_failure.load()) {
+		mavlink_log_warning(&_mavlink_log_pub, "Hardware fault: Camera capture disabled\t");
+		events::send(events::ID("camera_capture_trigger_rate_exceeded"),
+			     events::Log::Error, "Hardware fault: Camera capture disabled");
+		_trigger_rate_failure.store(false);
+	}
+
 	camera_trigger_s trigger{};
 
 	// MODES 1 and 2 are not fully tested
 	if (_camera_capture_mode == 0 || _gpio_capture) {
-		trigger.timestamp = _trigger.edge_time - uint64_t(1000 * _strobe_delay);
+		trigger.timestamp = _trigger.hrt_edge_time - uint64_t(1000 * _strobe_delay);
 		trigger.seq = _capture_seq++;
 		_last_trig_time = trigger.timestamp;
+
 		publish = true;
 
 	} else if (_camera_capture_mode == 1) { // Get timestamp of mid-exposure (active high)
 		if (_trigger.edge_state == 1) {
-			_last_trig_begin_time = _trigger.edge_time - uint64_t(1000 * _strobe_delay);
+			_last_trig_begin_time = _trigger.hrt_edge_time - uint64_t(1000 * _strobe_delay);
 
 		} else if (_trigger.edge_state == 0 && _last_trig_begin_time > 0) {
-			trigger.timestamp = _trigger.edge_time - ((_trigger.edge_time - _last_trig_begin_time) / 2);
+			trigger.timestamp = _trigger.hrt_edge_time - ((_trigger.hrt_edge_time - _last_trig_begin_time) / 2);
 			trigger.seq = _capture_seq++;
-			_last_exposure_time = _trigger.edge_time - _last_trig_begin_time;
+			_last_exposure_time = _trigger.hrt_edge_time - _last_trig_begin_time;
 			_last_trig_time = trigger.timestamp;
 			publish = true;
 			_capture_seq++;
@@ -170,12 +181,12 @@ CameraCapture::publish_trigger()
 
 	} else { // Get timestamp of mid-exposure (active low)
 		if (_trigger.edge_state == 0) {
-			_last_trig_begin_time = _trigger.edge_time - uint64_t(1000 * _strobe_delay);
+			_last_trig_begin_time = _trigger.hrt_edge_time - uint64_t(1000 * _strobe_delay);
 
 		} else if (_trigger.edge_state == 1 && _last_trig_begin_time > 0) {
-			trigger.timestamp = _trigger.edge_time - ((_trigger.edge_time - _last_trig_begin_time) / 2);
+			trigger.timestamp = _trigger.hrt_edge_time - ((_trigger.hrt_edge_time - _last_trig_begin_time) / 2);
 			trigger.seq = _capture_seq++;
-			_last_exposure_time = _trigger.edge_time - _last_trig_begin_time;
+			_last_exposure_time = _trigger.hrt_edge_time - _last_trig_begin_time;
 			_last_trig_time = trigger.timestamp;
 			publish = true;
 		}
@@ -189,6 +200,25 @@ CameraCapture::publish_trigger()
 		return;
 	}
 
+	pps_capture_s pps_capture;
+
+	if (_pps_capture_sub.update(&pps_capture)) {
+		_pps_hrt_timestamp = pps_capture.timestamp;
+		_pps_rtc_timestamp = pps_capture.rtc_timestamp;
+	}
+
+
+	if (_pps_hrt_timestamp > 0) {
+		// Last PPS RTC time + elapsed time to the camera capture interrupt
+		trigger.timestamp_utc = _pps_rtc_timestamp + (trigger.timestamp - _pps_hrt_timestamp);
+
+	} else {
+		// No PPS capture received, use RTC clock as fallback
+		timespec tv{};
+		px4_clock_gettime(CLOCK_REALTIME, &tv);
+		trigger.timestamp_utc = ts_to_abstime(&tv) - hrt_elapsed_time(&trigger.timestamp);
+	}
+
 	_trigger_pub.publish(trigger);
 }
 
@@ -196,7 +226,9 @@ void
 CameraCapture::capture_trampoline(void *context, uint32_t chan_index, hrt_abstime edge_time, uint32_t edge_state,
 				  uint32_t overflow)
 {
-	camera_capture::g_camera_capture->capture_callback(chan_index, edge_time, edge_state, overflow);
+	if (camera_capture::g_camera_capture) {
+		camera_capture::g_camera_capture->capture_callback(chan_index, edge_time, edge_state, overflow);
+	}
 }
 
 void
@@ -230,7 +262,7 @@ CameraCapture::Run()
 
 			command_ack.timestamp = hrt_absolute_time();
 			command_ack.command = cmd.command;
-			command_ack.result = (uint8_t)vehicle_command_s::VEHICLE_CMD_RESULT_ACCEPTED;
+			command_ack.result = (uint8_t)vehicle_command_ack_s::VEHICLE_CMD_RESULT_ACCEPTED;
 			command_ack.target_system = cmd.source_system;
 			command_ack.target_component = cmd.source_component;
 
@@ -328,6 +360,11 @@ CameraCapture::stop()
 	ScheduleClear();
 
 	work_cancel(HPWORK, &_work_publisher);
+
+	if (_capture_channel >= 0) {
+		up_input_capture_set(_capture_channel, Disabled, 0, nullptr, nullptr);
+	}
+
 
 	if (camera_capture::g_camera_capture != nullptr) {
 		delete (camera_capture::g_camera_capture);

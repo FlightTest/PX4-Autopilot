@@ -404,9 +404,9 @@ Syslink::handle_message(syslink_message_t *msg)
 		memcpy(&vbat, &msg->data[1], sizeof(float));
 		//memcpy(&iset, &msg->data[5], sizeof(float));
 
-		_battery.updateBatteryStatus(t, vbat, -1, true,
-					     battery_status_s::BATTERY_SOURCE_POWER_MODULE, 0, 0);
-
+		_battery.setConnected(true);
+		_battery.updateVoltage(vbat);
+		_battery.updateAndPublishBatteryStatus(t);
 
 		// Update battery charge state
 		if (charging) {
@@ -547,6 +547,9 @@ Syslink::handle_raw(syslink_message_t *sys)
 		rc.values[2] = yaw * 500 / 150 + 1500;
 		rc.values[3] = cmd->thrust * 1000 / USHRT_MAX + 1000;
 		rc.values[4] = 1000; // Dummy channel as px4 needs at least 5
+
+		rc.link_quality = -1;
+		rc.rssi_dbm = NAN;
 
 		_rc_pub.publish(rc);
 

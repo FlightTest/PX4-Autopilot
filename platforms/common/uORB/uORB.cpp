@@ -40,10 +40,16 @@
 
 #include "uORBManager.hpp"
 #include "uORBCommon.hpp"
+#include "uORBMessageFields.hpp"
+
 
 #include <lib/drivers/device/Device.hpp>
 #include <matrix/Quaternion.hpp>
 #include <mathlib/mathlib.h>
+
+#ifdef __PX4_NUTTX
+#include <sys/boardctl.h>
+#endif
 
 static uORB::DeviceMaster *g_dev = nullptr;
 
@@ -60,6 +66,7 @@ int uorb_start(void)
 		return -ENOMEM;
 	}
 
+#if !defined(__PX4_NUTTX) || defined(CONFIG_BUILD_FLAT) || defined(__KERNEL__)
 	/* create the driver */
 	g_dev = uORB::Manager::get_instance()->get_device_master();
 
@@ -67,11 +74,15 @@ int uorb_start(void)
 		return -errno;
 	}
 
+#endif
+
 	return OK;
 }
 
 int uorb_status(void)
 {
+#if !defined(__PX4_NUTTX) || defined(CONFIG_BUILD_FLAT) || defined(__KERNEL__)
+
 	if (g_dev != nullptr) {
 		g_dev->printStatistics();
 
@@ -79,11 +90,16 @@ int uorb_status(void)
 		PX4_INFO("uorb is not running");
 	}
 
+#else
+	boardctl(ORBIOCDEVMASTERCMD, ORB_DEVMASTER_STATUS);
+#endif
 	return OK;
 }
 
 int uorb_top(char **topic_filter, int num_filters)
 {
+#if !defined(__PX4_NUTTX) || defined(CONFIG_BUILD_FLAT) || defined(__KERNEL__)
+
 	if (g_dev != nullptr) {
 		g_dev->showTop(topic_filter, num_filters);
 
@@ -91,6 +107,9 @@ int uorb_top(char **topic_filter, int num_filters)
 		PX4_INFO("uorb is not running");
 	}
 
+#else
+	boardctl(ORBIOCDEVMASTERCMD, ORB_DEVMASTER_TOP);
+#endif
 	return OK;
 }
 
@@ -178,7 +197,7 @@ int orb_get_interval(int handle, unsigned *interval)
 
 const char *orb_get_c_type(unsigned char short_type)
 {
-	// this matches with the uorb o_fields generator
+	// this matches with the uorb type_map_short python data
 	switch (short_type) {
 	case 0x82: return "int8_t";
 
@@ -221,25 +240,29 @@ void orb_print_message_internal(const orb_metadata *meta, const void *data, bool
 	const uint8_t *data_ptr = (const uint8_t *)data;
 	int data_offset = 0;
 
-	for (int format_idx = 0; meta->o_fields[format_idx] != 0;) {
-		const char *end_field = strchr(meta->o_fields + format_idx, ';');
+	// Find message format
+	char format_buffer[128];
+	uORB::MessageFormatReader format_reader(format_buffer, sizeof(format_buffer));
 
-		if (!end_field) {
-			PX4_ERR("Format error in %s", meta->o_fields);
-			return;
-		}
+	if (!format_reader.readUntilFormat(meta->o_id)) {
+		PX4_ERR("Failed to get uorb format");
+		return;
+	}
 
-		const char *c_type = orb_get_c_type(meta->o_fields[format_idx]);
-		const int end_field_idx = end_field - meta->o_fields;
+	int field_length = 0;
+
+	while (format_reader.readNextField(field_length)) {
+
+		const char *c_type = orb_get_c_type(format_buffer[0]);
 
 		int array_idx = -1;
 		int field_name_idx = -1;
 
-		for (int field_idx = format_idx; field_idx != end_field_idx; ++field_idx) {
-			if (meta->o_fields[field_idx] == '[') {
+		for (int field_idx = 0; field_idx < field_length; ++field_idx) {
+			if (format_buffer[field_idx] == '[') {
 				array_idx = field_idx + 1;
 
-			} else if (meta->o_fields[field_idx] == ' ') {
+			} else if (format_buffer[field_idx] == ' ') {
 				field_name_idx = field_idx + 1;
 				break;
 			}
@@ -248,19 +271,10 @@ void orb_print_message_internal(const orb_metadata *meta, const void *data, bool
 		int array_size = 1;
 
 		if (array_idx >= 0) {
-			array_size = strtol(meta->o_fields + array_idx, nullptr, 10);
+			array_size = strtol(format_buffer + array_idx, nullptr, 10);
 		}
 
-		char field_name[80];
-		size_t field_name_len = end_field_idx - field_name_idx;
-
-		if (field_name_len >= sizeof(field_name)) {
-			PX4_ERR("field name too long %s (max: %u)", meta->o_fields, (unsigned)sizeof(field_name));
-			return;
-		}
-
-		memcpy(field_name, meta->o_fields + field_name_idx, field_name_len);
-		field_name[field_name_len] = '\0';
+		const char *field_name = format_buffer + field_name_idx;
 
 		if (c_type) { // built-in type
 			bool dont_print = false;
@@ -329,12 +343,12 @@ void orb_print_message_internal(const orb_metadata *meta, const void *data, bool
 					data_offset += sizeof(uint64_t);
 
 				} else if (strcmp(c_type, "float") == 0) {
-					if (!dont_print) { PX4_INFO_RAW("%.4f", (double) * (float *)(data_ptr + data_offset)); }
+					if (!dont_print) { PX4_INFO_RAW("%.5f", (double) * (float *)(data_ptr + data_offset)); }
 
 					data_offset += sizeof(float);
 
 				} else if (strcmp(c_type, "double") == 0) {
-					if (!dont_print) { PX4_INFO_RAW("%.4f", *(double *)(data_ptr + data_offset)); }
+					if (!dont_print) { PX4_INFO_RAW("%.6f", *(double *)(data_ptr + data_offset)); }
 
 					data_offset += sizeof(double);
 
@@ -381,7 +395,7 @@ void orb_print_message_internal(const orb_metadata *meta, const void *data, bool
 				} else if (strstr(field_name, "flags") != nullptr) {
 					// bitfield
 					unsigned field_size = 0;
-					unsigned long value = 0;
+					uint64_t value = 0;
 
 					if (strcmp(c_type, "uint8_t") == 0) {
 						field_size = sizeof(uint8_t);
@@ -394,13 +408,24 @@ void orb_print_message_internal(const orb_metadata *meta, const void *data, bool
 					} else if (strcmp(c_type, "uint32_t") == 0) {
 						field_size = sizeof(uint32_t);
 						value = *(uint32_t *)(data_ptr + previous_data_offset);
+
+					} else if (strcmp(c_type, "uint64_t") == 0) {
+						field_size = sizeof(uint64_t);
+						value = *(uint64_t *)(data_ptr + previous_data_offset);
 					}
 
-					if (field_size > 0) {
+					if (field_size > 0 && value != 0) {
 						PX4_INFO_RAW(" (0b");
 
+						bool got_set_bit = false;
+
 						for (int i = (field_size * 8) - 1; i >= 0; i--) {
-							PX4_INFO_RAW("%lu%s", (value >> i) & 1, ((unsigned)i < (field_size * 8) - 1 && i % 4 == 0 && i > 0) ? "'" : "");
+							unsigned current_bit = (value >> i) & 1;
+							got_set_bit |= current_bit;
+
+							if (got_set_bit) {
+								PX4_INFO_RAW("%u%s", current_bit, ((unsigned)i < (field_size * 8) - 1 && i % 4 == 0 && i > 0) ? "'" : "");
+							}
 						}
 
 						PX4_INFO_RAW(")");
@@ -429,17 +454,10 @@ void orb_print_message_internal(const orb_metadata *meta, const void *data, bool
 
 		} else {
 
-			// extract the topic name
-			char topic_name[80];
-			const size_t topic_name_len = array_size > 1 ? array_idx - format_idx - 1 : field_name_idx - format_idx - 1;
-
-			if (topic_name_len >= sizeof(topic_name)) {
-				PX4_ERR("topic name too long in %s (max: %u)", meta->o_name, (unsigned)sizeof(topic_name));
-				return;
-			}
-
-			memcpy(topic_name, meta->o_fields + format_idx, topic_name_len);
-			field_name[topic_name_len] = '\0';
+			// Get the topic name
+			const size_t topic_name_len = array_size > 1 ? array_idx - 1 : field_name_idx - 1;
+			format_buffer[topic_name_len] = '\0';
+			const char *topic_name = format_buffer;
 
 			// find the metadata
 			const orb_metadata *const *topics = orb_get_topics();
@@ -470,7 +488,5 @@ void orb_print_message_internal(const orb_metadata *meta, const void *data, bool
 				data_offset += found_topic->o_size;
 			}
 		}
-
-		format_idx = end_field_idx + 1;
 	}
 }

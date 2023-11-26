@@ -32,11 +32,13 @@
  ****************************************************************************/
 
 #include <px4_platform_common/init.h>
+#include <px4_platform_common/log.h>
 #include <px4_platform_common/px4_config.h>
 #include <px4_platform_common/px4_manifest.h>
 #include <px4_platform_common/console_buffer.h>
 #include <px4_platform_common/defines.h>
 #include <drivers/drv_hrt.h>
+#include <lib/events/events.h>
 #include <lib/parameters/param.h>
 #include <px4_platform_common/px4_work_queue/WorkQueueManager.hpp>
 #include <px4_platform/cpuload.h>
@@ -56,41 +58,45 @@
 #include <px4_platform_common/crypto.h>
 #endif
 
+#if !defined(CONFIG_BUILD_FLAT)
+#include <px4_platform/board_ctrl.h>
+#endif
+
 extern void cdcacm_init(void);
 
-int px4_platform_init()
+#if !defined(CONFIG_BUILD_FLAT)
+typedef CODE void (*initializer_t)(void);
+extern initializer_t _sinit;
+extern initializer_t _einit;
+extern uint32_t _stext;
+extern uint32_t _etext;
+
+static void cxx_initialize(void)
 {
+	initializer_t *initp;
 
-	int ret = px4_console_buffer_init();
+	/* Visit each entry in the initialization table */
 
-	if (ret < 0) {
-		return ret;
+	for (initp = &_sinit; initp != &_einit; initp++) {
+		initializer_t initializer = *initp;
+
+		/* Make sure that the address is non-NULL and lies in the text
+		* region defined by the linker script.  Some toolchains may put
+		* NULL values or counts in the initialization table.
+		*/
+
+		if ((FAR void *)initializer >= (FAR void *)&_stext &&
+		    (FAR void *)initializer < (FAR void *)&_etext) {
+			initializer();
+		}
 	}
-
-	// replace stdout with our buffered console
-	int fd_buf = open(CONSOLE_BUFFER_DEVICE, O_WRONLY);
-
-	if (fd_buf >= 0) {
-		dup2(fd_buf, 1);
-		// keep stderr(2) untouched: the buffered console will use it to output to the original console
-		close(fd_buf);
-	}
-
-#if defined(PX4_CRYPTO)
-	PX4Crypto::px4_crypto_init();
+}
 #endif
-
-	hrt_init();
-
-	param_init();
-
-	/* configure CPU load estimation */
-#ifdef CONFIG_SCHED_INSTRUMENTATION
-	cpuload_initialize_once();
-#endif
-
 
 #if defined(CONFIG_I2C)
+void px4_platform_i2c_init()
+{
+
 	I2CBusIterator i2c_bus_iterator {I2CBusIterator::FilterType::All};
 
 	while (i2c_bus_iterator.next()) {
@@ -114,13 +120,60 @@ int px4_platform_init()
 
 		px4_i2cbus_uninitialize(i2c_dev);
 	}
+}
 
 #endif // CONFIG_I2C
+
+int px4_platform_init()
+{
+
+#if !defined(CONFIG_BUILD_FLAT)
+	cxx_initialize();
+
+	/* initialize userspace-kernelspace call gate interface */
+	kernel_ioctl_initialize();
+#endif
+
+	int ret = px4_console_buffer_init();
+
+	if (ret < 0) {
+		return ret;
+	}
+
+	// replace stdout with our buffered console
+	int fd_buf = open(CONSOLE_BUFFER_DEVICE, O_WRONLY);
+
+	if (fd_buf >= 0) {
+		dup2(fd_buf, 1);
+		// keep stderr(2) untouched: the buffered console will use it to output to the original console
+		close(fd_buf);
+	}
+
+#if defined(PX4_CRYPTO)
+	PX4Crypto::px4_crypto_init();
+#endif
+
+	hrt_init();
+
+#if !defined(CONFIG_BUILD_FLAT)
+	hrt_ioctl_init();
+	events_ioctl_init();
+#endif
+
+	/* configure CPU load estimation */
+#ifdef CONFIG_SCHED_INSTRUMENTATION
+	cpuload_initialize_once();
+#endif
+
+
+#if defined(CONFIG_I2C) && !defined(BOARD_I2C_LATEINIT)
+	px4_platform_i2c_init();
+#endif
 
 #if defined(CONFIG_FS_PROCFS)
 	int ret_mount_procfs = mount(nullptr, "/proc", "procfs", 0, nullptr);
 
-	if (ret < 0) {
+	if (ret_mount_procfs < 0) {
 		syslog(LOG_ERR, "ERROR: Failed to mount procfs at /proc: %d\n", ret_mount_procfs);
 	}
 
@@ -135,8 +188,9 @@ int px4_platform_init()
 
 #endif // CONFIG_FS_BINFS
 
-
 	px4::WorkQueueManagerStart();
+
+	param_init();
 
 	uorb_start();
 

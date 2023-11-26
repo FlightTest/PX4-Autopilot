@@ -47,6 +47,8 @@ ControlAllocationSequentialDesaturation::allocate()
 	//Compute new gains if needed
 	updatePseudoInverse();
 
+	_prev_actuator_sp = _actuator_sp;
+
 	switch (_param_mc_airmode.get()) {
 	case 1:
 		mixAirmodeRP();
@@ -60,9 +62,6 @@ ControlAllocationSequentialDesaturation::allocate()
 		mixAirmodeDisabled();
 		break;
 	}
-
-	// Clip
-	clipActuatorSetpoint(_actuator_sp);
 }
 
 void ControlAllocationSequentialDesaturation::desaturateActuators(
@@ -93,8 +92,8 @@ float ControlAllocationSequentialDesaturation::computeDesaturationGain(const Act
 	float k_max = 0.f;
 
 	for (int i = 0; i < _num_actuators; i++) {
-		// Avoid division by zero. If desaturation_vector(i) is zero, there's nothing we can do to unsaturate anyway
-		if (fabsf(desaturation_vector(i)) < FLT_EPSILON) {
+		// Do not use try to desaturate using an actuator with weak effectiveness to avoid large desaturation gains
+		if (fabsf(desaturation_vector(i)) < 0.2f) {
 			continue;
 		}
 

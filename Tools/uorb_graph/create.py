@@ -56,6 +56,21 @@ def get_N_colors(N, s=0.8, v=0.9):
         hex_out.append("#"+"".join(map(lambda x: format(x, '02x'), rgb)))
     return hex_out
 
+def topic_filename(topic):
+    MSG_PATH = 'msg/'
+
+    file_list = os.listdir(MSG_PATH)
+    msg_files = [file.replace('.msg', '') for file in file_list if file.endswith(".msg")]
+
+    if topic in msg_files:
+        return topic
+    else:
+        for msg_file in msg_files:
+            with open(f'{MSG_PATH}/{msg_file}.msg') as f:
+                ret = re.findall(f'^# TOPICS.*{topic}.*',f.read(),re.MULTILINE)
+                if len(ret) > 0:
+                    return msg_file
+    return "no_file"
 
 class PubSub(object):
     """ Collects either publication or subscription information for nodes
@@ -94,10 +109,6 @@ class PubSub(object):
             route_group, topic_group = match.groups()
 
             log.debug("          ####:{}:  {}, {}".format( self._name, route_group, topic_group))
-
-            # # TODO: handle this case... but not sure where, yet
-            # if match == 'ORB_ID_VEHICLE_ATTITUDE_CONTROLS': # special case
-            #     match = orb_id+orb_id_vehicle_attitude_controls_topic
 
             # match has the form: '[ORB_ID(]<topic_name>'
             if route_group:
@@ -216,9 +227,6 @@ class Graph(object):
         self._path_blacklist = []
 
         self._topic_blacklist = set(kwargs.get('topic_blacklist',set()))
-
-        self._orb_id_vehicle_attitude_controls_topic = 'actuator_controls_0'
-        self._orb_id_vehicle_attitude_controls_re = re.compile(r'\#define\s+ORB_ID_VEHICLE_ATTITUDE_CONTROLS\s+([^,)]+)')
 
         self._warnings = [] # list of all ambiguous scan sites
 
@@ -495,18 +503,7 @@ class Graph(object):
                 elif current_scope.name == 'uorb_tests': # skip this
                     return
                 elif current_scope.name == 'uorb':
-
-                    # search and validate the ORB_ID_VEHICLE_ATTITUDE_CONTROLS define
-                    matches = self._orb_id_vehicle_attitude_controls_re.findall(content)
-                    for match in matches:
-                        if match != 'ORB_ID('+self._orb_id_vehicle_attitude_controls_topic:
-                            # if we land here, you need to change _orb_id_vehicle_attitude_controls_topic
-                            raise Exception(
-                                'The extracted define for ORB_ID_VEHICLE_ATTITUDE_CONTROLS '
-                                'is '+match+' but expected ORB_ID('+
-                                self._orb_id_vehicle_attitude_controls_topic)
-
-                    return # skip uorb module for the rest
+                    return # skip this
 
             line_number = 0
             for full_line in content.splitlines():
@@ -679,8 +676,7 @@ class OutputJSON(object):
             node['type'] = 'topic'
             node['color'] = topic_colors[topic]
             # url is opened when double-clicking on the node
-            # TODO: does not work for multi-topics
-            node['url'] = 'https://github.com/PX4/PX4-Autopilot/blob/master/msg/'+topic+'.msg'
+            node['url'] = 'https://github.com/PX4/PX4-Autopilot/blob/main/msg/'+topic_filename(topic)+'.msg'
             nodes.append(node)
 
         data['nodes'] = nodes

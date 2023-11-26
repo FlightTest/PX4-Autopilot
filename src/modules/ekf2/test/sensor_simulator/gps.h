@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2019 ECL Development Team. All rights reserved.
+ *   Copyright (c) 2019-2023 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -51,7 +51,7 @@ public:
 	Gps(std::shared_ptr<Ekf> ekf);
 	~Gps();
 
-	void setData(const gps_message &gps);
+	void setData(const gpsMessage &gps);
 	void stepHeightByMeters(const float hgt_change);
 	void stepHorizontalPositionByMeters(const Vector2f hpos_change);
 	void setPositionRateNED(const Vector3f &rate);
@@ -65,12 +65,12 @@ public:
 	void setNumberOfSatellites(const int num_satellites);
 	void setPdop(const float pdop);
 
-	gps_message getDefaultGpsData();
+	gpsMessage getDefaultGpsData();
 
 private:
 	void send(uint64_t time) override;
 
-	gps_message _gps_data{};
+	gpsMessage _gps_data{};
 	Vector3f _gps_pos_rate{};
 };
 
